@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     branches:
+      - main
       - master
     tags:
       - '*'
@@ -65,7 +66,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   dockerize-edge:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
 
     steps:
