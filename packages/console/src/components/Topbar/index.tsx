@@ -6,8 +6,7 @@ import { useTranslation } from 'react-i18next';
 import ContactIcon from '@/assets/icons/contact-us.svg?react';
 import CubeIcon from '@/assets/icons/cube.svg?react';
 import DocumentIcon from '@/assets/icons/document-nav-button.svg?react';
-import CloudLogo from '@/assets/images/cloud-logo.svg?react';
-import Logo from '@/assets/images/logo.svg?react';
+import BrandLogo from '@/components/BrandLogo';
 import { githubReleasesLink } from '@/consts';
 import { isCloud } from '@/consts/env';
 import DynamicT from '@/ds-components/DynamicT';
@@ -36,7 +35,7 @@ type Props = {
 function Topbar({ className, hideTenantSelector, hideTitle }: Props) {
   const { t } = useTranslation(undefined, { keyPrefix: 'admin_console' });
   const { navigate } = useTenantPathname();
-  const LogtoLogo = isCloud ? CloudLogo : Logo;
+  const LogtoLogo = BrandLogo;
 
   return (
     <div className={classNames(styles.topbar, className)}>

@@ -1,17 +1,10 @@
 import { useFormContext } from 'react-hook-form';
-import { Trans } from 'react-i18next';
 
-import { CloudTag } from '@/components/FeatureTag';
 import { latestProPlanId } from '@/consts/subscriptions';
-import DynamicT from '@/ds-components/DynamicT';
 import FormField from '@/ds-components/FormField';
 import Switch from '@/ds-components/Switch';
-import TextLink from '@/ds-components/TextLink';
-import { buildCloudUpsellUrl, ossUpsellEntries } from '@/utils/oss-upsell';
 
 import type { SignInExperienceForm } from '../../../types';
-
-import styles from './index.module.scss';
 
 type Props = {
   readonly variant: 'cloud' | 'oss';
@@ -20,7 +13,6 @@ type Props = {
 
 function HideLogtoBrandingField({ variant, isEnabledInCloud }: Props) {
   const { register } = useFormContext<SignInExperienceForm>();
-  const cloudUpsellUrl = buildCloudUpsellUrl(ossUpsellEntries.signInExpHideLogtoBrandingOssNote);
 
   if (variant === 'cloud') {
     return (
@@ -41,32 +33,11 @@ function HideLogtoBrandingField({ variant, isEnabledInCloud }: Props) {
   }
 
   return (
-    <FormField
-      title={
-        <div className={styles.titleRow}>
-          <DynamicT forKey="sign_in_exp.branding.hide_logto_branding" />
-          <CloudTag>
-            <DynamicT forKey="sign_in_exp.custom_ui.cloud_tag" />
-          </CloudTag>
-        </div>
-      }
-    >
+    <FormField title="sign_in_exp.branding.hide_logto_branding">
       <Switch
-        disabled
-        readOnly
         description="sign_in_exp.branding.hide_logto_branding_description"
-        checked={false}
+        {...register('hideLogtoBranding')}
       />
-      <div className={styles.ossNote}>
-        <Trans
-          i18nKey="admin_console.sign_in_exp.branding.hide_logto_branding_oss_note"
-          components={{
-            a: (
-              <TextLink href={cloudUpsellUrl} targetBlank="noopener" className={styles.highlight} />
-            ),
-          }}
-        />
-      </div>
     </FormField>
   );
 }

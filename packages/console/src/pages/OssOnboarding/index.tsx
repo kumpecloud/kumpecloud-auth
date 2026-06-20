@@ -7,7 +7,7 @@ import { Navigate } from 'react-router-dom';
 import BriefcaseIcon from '@/assets/icons/briefcase.svg?react';
 import BuildingIcon from '@/assets/icons/building.svg?react';
 import PizzaIcon from '@/assets/icons/pizza.svg?react';
-import Logo from '@/assets/images/logo.svg?react';
+import BrandLogo from '@/components/BrandLogo';
 import ActionBar from '@/components/ActionBar';
 import PageMeta from '@/components/PageMeta';
 import { AppThemeContext } from '@/contexts/AppThemeProvider';
@@ -97,7 +97,7 @@ function OssOnboarding() {
     <div className={styles.page}>
       <PageMeta titleKey="oss_onboarding.page_title" />
       <div className={styles.topbar}>
-        <Logo className={styles.logo} />
+        <BrandLogo className={styles.logo} />
       </div>
       <OverlayScrollbar className={styles.contentContainer}>
         <div className={styles.content}>

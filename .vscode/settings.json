@@ -58,5 +58,6 @@
     "topbar",
     "upsell",
     "withtyped"
-  ]
+  ],
+  "standard.enable": false
 }

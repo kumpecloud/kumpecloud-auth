@@ -42,10 +42,10 @@ const sign_in_exp = {
     app_logo_and_favicon: 'App logo and favicon',
     company_logo_and_favicon: 'Company logo and favicon',
     organization_logo_and_favicon: 'Organization logo and favicon',
-    hide_logto_branding: 'Hide Logto branding',
+    hide_logto_branding: 'Hide sign-in footer',
     hide_logto_branding_description:
-      'Remove "Powered by Logto". Spotlight your brand exclusively with a clean, professional sign-in experience.',
-    hide_logto_branding_oss_note: 'This feature is natively available in <a>Logto Cloud</a>.',
+      'Remove the KumpeCloud Auth footer from the sign-in experience.',
+    hide_logto_branding_oss_note: 'You can hide the sign-in footer on self-hosted instances.',
   },
   branding_uploads: {
     app_logo: {

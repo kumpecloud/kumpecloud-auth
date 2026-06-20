@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: logto
+    name: kumpecloud-auth
     env: docker
-    repo: https://github.com/logto-io/logto.git
+    repo: https://github.com/kumpecloud/kumpecloud-auth.git
     region: oregon
     branch: master
     envVars:
@@ -16,10 +16,10 @@ services:
         value: 1
       - key: DB_URL_DEFAULT
         fromDatabase:
-          name: logto-database
+          name: kumpecloud-auth-database
           property: connectionString
 
 databases:
-  - name: logto-database
+  - name: kumpecloud-auth-database
     databaseName: logto
-    ipAllowList: [] # only allow internal connections
+    ipAllowList: []
