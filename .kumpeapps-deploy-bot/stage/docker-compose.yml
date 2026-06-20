@@ -1,0 +1,66 @@
+# KumpeCloud Auth staging stack for kumpeapps-deploy-bot.
+#
+# Required host environment variables (map via stage.yml env_mappings):
+#   ENDPOINT          Public OIDC/API URL, e.g. https://auth.stage.kumpe.app
+#   ADMIN_ENDPOINT    Public admin console URL, e.g. https://auth-console.stage.kumpe.app
+#   POSTGRES_PASSWORD Postgres password for the auth database
+#
+# Optional:
+#   KUMPECLOUD_AUTH_TAG  Image tag (default: edge)
+#   PRIVATE_KEY_ROTATION_GRACE_PERIOD  OIDC key rotation grace period in seconds
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: logto
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d logto']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  kumpecloud-auth:
+    image: ghcr.io/kumpecloud/kumpecloud-auth:${KUMPECLOUD_AUTH_TAG:-edge}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # Caddy reverse-proxies to the VM/Nebula IP on these ports.
+      - '3001:3001'
+      - '3002:3002'
+    environment:
+      TRUST_PROXY_HEADER: '1'
+      DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/logto
+      ENDPOINT: ${ENDPOINT:?ENDPOINT is required}
+      ADMIN_ENDPOINT: ${ADMIN_ENDPOINT:?ADMIN_ENDPOINT is required}
+      ALL_YES: '1'
+      NO_INQUIRY: '0'
+      PRIVATE_KEY_ROTATION_GRACE_PERIOD: ${PRIVATE_KEY_ROTATION_GRACE_PERIOD:-}
+    entrypoint:
+      - sh
+      - -c
+      - npm run cli db seed -- --swe && npm start
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          'fetch("http://127.0.0.1:3001/api/status").then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+volumes:
+  postgres_data:

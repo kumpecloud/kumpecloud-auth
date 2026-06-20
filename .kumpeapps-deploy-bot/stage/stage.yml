@@ -1,0 +1,27 @@
+# Staging deployment for KumpeCloud Auth
+
+deployment_type: docker
+assigned_username: justinkumpe
+vm_hostname: stage-vm-kumpecloud-auth
+
+authorized_admins:
+  - github.repo.admins
+
+domains:
+  - auth.stage.kumpe.app
+  - auth-console.stage.kumpe.app
+
+docker_compose: docker-compose.yml
+
+env_mappings:
+  NEBULA_CLIENT_TOKEN: STAGE_NEBULA_CLIENT_TOKEN
+  ENDPOINT: STAGE_AUTH_ENDPOINT
+  ADMIN_ENDPOINT: STAGE_AUTH_ADMIN_ENDPOINT
+  POSTGRES_PASSWORD: STAGE_AUTH_POSTGRES_PASSWORD
+
+deploy_rules:
+  - environment: stage
+    branches:
+      include:
+        - main
+        - master
