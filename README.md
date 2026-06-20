@@ -35,7 +35,6 @@ KumpeCloud Auth is derived from [Logto](https://github.com/logto-io/logto) by Si
 This fork:
 
 - Rebrands the admin console and sign-in experience as **KumpeCloud Auth**
-- Removes OSS restrictions such as the 3 SAML application limit
 - Publishes Docker images to `ghcr.io/kumpecloud/kumpecloud-auth`
 
 Internal package names, environment variables, and APIs remain compatible with upstream Logto unless noted otherwise.
