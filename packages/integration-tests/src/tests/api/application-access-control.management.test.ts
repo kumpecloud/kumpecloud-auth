@@ -67,26 +67,15 @@ const createOrReuseSamlApplication = async () => {
     throwHttpErrors: false,
   });
 
-  if (response.ok) {
-    return {
-      application: await response.json<Awaited<ReturnType<typeof getSamlApplication>>>(),
-      shouldDelete: true,
-    };
+  if (!response.ok) {
+    const error = await response.json<{ code?: string }>();
+    throw new Error(`Failed to create SAML application: ${response.status} ${error.code ?? ''}`);
   }
 
-  const error = await response.json<{ code?: string }>();
-  if (response.status === 403 && error.code === 'application.saml.reach_oss_limit') {
-    const [application] = await getApplications([ApplicationType.SAML]);
-
-    expect(application).toBeDefined();
-
-    return {
-      application: application!,
-      shouldDelete: false,
-    };
-  }
-
-  throw new Error(`Failed to create SAML application: ${response.status} ${error.code ?? ''}`);
+  return {
+    application: await response.json<Awaited<ReturnType<typeof getSamlApplication>>>(),
+    shouldDelete: true,
+  };
 };
 
 const createProtectedApplication = async () =>

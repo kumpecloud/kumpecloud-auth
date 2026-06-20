@@ -179,36 +179,13 @@
 .footer {
   display: flex;
   align-items: center;
-  font: var(--font-label-2);
-  font-weight: normal;
-  color: var(--color-neutral-variant-60);
+  justify-content: center;
   padding: _.unit(1) _.unit(2);
-  text-decoration: none;
   opacity: 75%;
 
-  span {
-    margin-inline-end: _.unit(1);
-  }
-
-  .staticLogo {
-    display: block;
-  }
-
-  .highlightLogo {
-    display: none;
-  }
-
-  &:hover,
-  &:active {
-    opacity: 100%;
-
-    .staticLogo {
-      display: none;
-    }
-
-    .highlightLogo {
-      display: block;
-    }
+  .logo {
+    height: 36px;
+    width: auto;
   }
 }
 

@@ -7,14 +7,11 @@ import { FormProvider, useController, useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trans, useTranslation } from 'react-i18next';
 import Modal from 'react-modal';
-import useSWR, { useSWRConfig } from 'swr';
+import { useSWRConfig } from 'swr';
 
 import { GtagConversionId, reportToGoogle } from '@/components/Conversion/utils';
 import LearnMore from '@/components/LearnMore';
-import SamlAppLimitBanner from '@/components/SamlAppLimitBanner';
-import { defaultPageSize, integrateLogto, thirdPartyApp } from '@/consts';
-import { ossSamlApplicationsLimit } from '@/consts/application-limits';
-import { isCloud } from '@/consts/env';
+import { integrateLogto, thirdPartyApp } from '@/consts';
 import { latestProPlanId } from '@/consts/subscriptions';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import { TenantsContext } from '@/contexts/TenantsProvider';
@@ -24,7 +21,6 @@ import ModalLayout from '@/ds-components/ModalLayout';
 import RadioGroup, { Radio } from '@/ds-components/RadioGroup';
 import TextInput from '@/ds-components/TextInput';
 import TextLink from '@/ds-components/TextLink';
-import { type RequestError } from '@/hooks/use-api';
 import useApi from '@/hooks/use-api';
 import useApplicationsUsage from '@/hooks/use-applications-usage';
 import useDocumentationUrl from '@/hooks/use-documentation-url';
@@ -33,14 +29,12 @@ import modalStyles from '@/scss/modal.module.scss';
 import { applicationTypeI18nKey } from '@/types/applications';
 import { trySubmitSafe } from '@/utils/form';
 import { isPaidPlan } from '@/utils/subscription';
-import { buildUrl } from '@/utils/url';
 
 import AuthorizationFlowSelector from './AuthorizationFlowSelector';
 import Footer from './Footer';
 import styles from './index.module.scss';
 import { AuthorizationFlow, type CreateApplicationFormData } from './types';
 
-const applicationsEndpoint = 'api/applications';
 type AvailableApplicationTypeForCreation = Extract<
   ApplicationType,
   | ApplicationType.Native
@@ -81,18 +75,6 @@ function CreateForm({
     formState: { errors, isSubmitting },
   } = formMethods;
 
-  const { data } = useSWR<[Application[], number], RequestError>(
-    !isCloud &&
-      defaultCreateType === ApplicationType.SAML &&
-      buildUrl(applicationsEndpoint, [
-        ['page', String(1)],
-        ['page_size', String(defaultPageSize)],
-        ['isThirdParty', 'false'],
-        ['types', ApplicationType.SAML],
-      ])
-  );
-
-  const [_, samlAppTotalCount] = data ?? [];
   const {
     currentSubscription: { planId, isEnterprisePlan },
   } = useContext(SubscriptionDataContext);
@@ -255,19 +237,12 @@ function CreateForm({
         hasAddOnTag={hasAddOnTag}
         size={defaultCreateType ? 'medium' : 'large'}
         footer={
-          !isCloud &&
-          defaultCreateType === ApplicationType.SAML &&
-          typeof samlAppTotalCount === 'number' &&
-          samlAppTotalCount >= ossSamlApplicationsLimit ? (
-            <SamlAppLimitBanner variant="footer" limit={ossSamlApplicationsLimit} />
-          ) : (
-            <Footer
-              selectedType={value}
-              isLoading={isSubmitting}
-              isThirdParty={isDefaultCreateThirdParty}
-              onClickCreate={onSubmit}
-            />
-          )
+          <Footer
+            selectedType={value}
+            isLoading={isSubmitting}
+            isThirdParty={isDefaultCreateThirdParty}
+            onClickCreate={onSubmit}
+          />
         }
         onClose={onClose}
       >

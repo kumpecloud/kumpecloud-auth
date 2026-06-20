@@ -47,3 +47,7 @@ CLAUDE.md
 # console auto generated files
 /packages/console/src/consts/jwt-customizer-type-definition.ts
 packages/connectors/connector-whatsapp/test-send.mjs
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc

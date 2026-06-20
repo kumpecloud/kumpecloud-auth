@@ -11,7 +11,7 @@ import CustomContent from './CustomContent';
 import styles from './index.module.scss';
 
 const AppLayout = () => {
-  const { experienceSettings, theme } = useContext(PageContext);
+  const { experienceSettings } = useContext(PageContext);
   const { isMobile } = usePlatform();
   const hideLogtoBranding = experienceSettings?.hideLogtoBranding === true;
 
@@ -24,7 +24,6 @@ const AppLayout = () => {
           {!hideLogtoBranding && (
             <LogtoSignature
               className={classNames(styles.signature, layoutClassNames.signature)}
-              theme={theme}
             />
           )}
         </main>

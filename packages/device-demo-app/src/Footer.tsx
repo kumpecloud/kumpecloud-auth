@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import logoUrl from './assets/logo.png';
 import styles from './App.module.scss';
-import logtoLogoDark from './assets/logto-logo-dark.svg';
-import logtoLogoLight from './assets/logto-logo-light.svg';
-import logtoLogoShadow from './assets/logto-logo-shadow.svg';
-
-const logtoUrl = `https://logto.io/?${new URLSearchParams({
-  utm_source: 'sign_in',
-  utm_medium: 'powered_by',
-}).toString()}`;
 
 export const useIsDarkMode = () => {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -29,23 +22,11 @@ export const useIsDarkMode = () => {
   return isDarkMode;
 };
 
-const Footer = ({ isDarkMode }: { readonly isDarkMode: boolean }) => (
+const Footer = () => (
   <div className={styles.footerContainer}>
-    <a
-      className={styles.footer}
-      href={logtoUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Powered By Logto"
-    >
-      <span>Powered by</span>
-      <img className={styles.staticLogo} src={logtoLogoShadow} alt="Logto" />
-      <img
-        className={styles.highlightLogo}
-        src={isDarkMode ? logtoLogoDark : logtoLogoLight}
-        alt="Logto"
-      />
-    </a>
+    <div className={styles.footer} aria-label="KumpeCloud Auth">
+      <img className={styles.logo} src={logoUrl} alt="KumpeCloud Auth" />
+    </div>
   </div>
 );
 

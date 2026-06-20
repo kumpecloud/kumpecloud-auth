@@ -56,7 +56,7 @@ export const defaultTenantResponse: TenantResponse = {
  */
 export const defaultLogtoSku: LogtoSkuResponse = {
   id: ReservedPlanId.Development,
-  name: 'Logto Development plan',
+  name: 'KumpeCloud Auth Development plan',
   createdAt: new Date(),
   updatedAt: new Date(),
   type: LogtoSkuType.Basic,
@@ -89,8 +89,9 @@ export const defaultLogtoSku: LogtoSkuResponse = {
     bringYourUiEnabled: true,
     collectUserProfileEnabled: true,
     passkeySignInEnabled: true,
-    idpInitiatedSsoEnabled: false,
+    idpInitiatedSsoEnabled: true,
     securityFeaturesEnabled: true,
+    samlApplicationsLimit: null,
   },
 };
 
@@ -162,7 +163,7 @@ const getAdminTenantEndpoint = () => {
 
 export const adminTenantEndpoint = getAdminTenantEndpoint();
 
-export const mainTitle = isCloud ? 'Logto Cloud' : 'Logto Console';
+export const mainTitle = isCloud ? 'KumpeCloud Auth Cloud' : 'KumpeCloud Auth Console';
 
 // The threshold days to show the convert to production card in the get started page
 export const convertToProductionThresholdDays = 7;

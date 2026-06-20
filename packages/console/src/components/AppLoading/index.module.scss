@@ -9,7 +9,10 @@
   justify-content: center;
   overflow: hidden;
 
-  svg {
+  svg,
+  img {
     margin-bottom: _.unit(8);
+    height: 48px;
+    width: auto;
   }
 }
