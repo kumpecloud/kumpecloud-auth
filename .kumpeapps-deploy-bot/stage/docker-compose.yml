@@ -48,7 +48,19 @@ services:
     entrypoint:
       - sh
       - -c
-      - npm run cli db seed -- --swe && npm start
+      - |
+        set -eu
+        trim() { printf '%s' "$1" | tr -d '\r\n'; }
+        export ENDPOINT="$(trim "$ENDPOINT")"
+        export ADMIN_ENDPOINT="$(trim "$ADMIN_ENDPOINT")"
+        for name in ENDPOINT ADMIN_ENDPOINT; do
+          eval "value=\$$name"
+          if ! node -e 'new URL(process.argv[1])' "$value" >/dev/null 2>&1; then
+            echo "Invalid $name: '$value'" >&2
+            exit 1
+          fi
+        done
+        npm run cli db seed -- --swe --dapc && npm start
     healthcheck:
       test:
         [
