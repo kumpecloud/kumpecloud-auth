@@ -40,8 +40,9 @@ services:
     environment:
       TRUST_PROXY_HEADER: '1'
       DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/logto
-      ENDPOINT: ${ENDPOINT:?ENDPOINT is required}
-      ADMIN_ENDPOINT: ${ADMIN_ENDPOINT:?ADMIN_ENDPOINT is required}
+      # Domains are fixed in stage.yml; defaults keep the stack up if bot secret injection lags.
+      ENDPOINT: ${ENDPOINT:-https://auth.stage.kumpe.app}
+      ADMIN_ENDPOINT: ${ADMIN_ENDPOINT:-https://auth-console.stage.kumpe.app}
       ALL_YES: '1'
       NO_INQUIRY: '0'
       PRIVATE_KEY_ROTATION_GRACE_PERIOD: ${PRIVATE_KEY_ROTATION_GRACE_PERIOD:-}
@@ -50,17 +51,18 @@ services:
       - -c
       - |
         set -eu
-        trim() { printf '%s' "$1" | tr -d '\r\n'; }
-        export ENDPOINT="$(trim "$ENDPOINT")"
-        export ADMIN_ENDPOINT="$(trim "$ADMIN_ENDPOINT")"
-        for name in ENDPOINT ADMIN_ENDPOINT; do
-          eval "value=\$$name"
-          if ! node -e 'new URL(process.argv[1])' "$value" >/dev/null 2>&1; then
-            echo "Invalid $name: '$value'" >&2
-            exit 1
-          fi
-        done
-        npm run cli db seed -- --swe --dapc && npm start
+        trim() { printf '%s' "$$1" | tr -d '\r\n'; }
+        export ENDPOINT="$$(trim "$$ENDPOINT")"
+        export ADMIN_ENDPOINT="$$(trim "$$ADMIN_ENDPOINT")"
+        if [ -z "$$ENDPOINT" ] || ! node -e 'new URL(process.argv[1])' "$$ENDPOINT" >/dev/null 2>&1; then
+          echo "Invalid ENDPOINT: '$$ENDPOINT'" >&2
+          exit 1
+        fi
+        if [ -z "$$ADMIN_ENDPOINT" ] || ! node -e 'new URL(process.argv[1])' "$$ADMIN_ENDPOINT" >/dev/null 2>&1; then
+          echo "Invalid ADMIN_ENDPOINT: '$$ADMIN_ENDPOINT'" >&2
+          exit 1
+        fi
+        npm run cli db seed -- --swe --dapc && exec npm start
     healthcheck:
       test:
         [
