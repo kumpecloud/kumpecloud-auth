@@ -4,26 +4,17 @@ import type { TFuncKey } from 'i18next';
 import { getEmailConnectorUpsellCopyKeys, shouldShowEmailConnectorUpsellBanner } from './utils';
 
 describe('shouldShowEmailConnectorUpsellBanner', () => {
-  test('returns true for OSS email connectors', () => {
+  test('is disabled', () => {
     expect(
       shouldShowEmailConnectorUpsellBanner({
         type: ConnectorType.Email,
         isCloud: false,
-      })
-    ).toBe(true);
-  });
-
-  test('returns false for cloud or non-email cases', () => {
-    expect(
-      shouldShowEmailConnectorUpsellBanner({
-        type: ConnectorType.Email,
-        isCloud: true,
       })
     ).toBe(false);
     expect(
       shouldShowEmailConnectorUpsellBanner({
-        type: ConnectorType.Sms,
-        isCloud: false,
+        type: ConnectorType.Email,
+        isCloud: true,
       })
     ).toBe(false);
   });

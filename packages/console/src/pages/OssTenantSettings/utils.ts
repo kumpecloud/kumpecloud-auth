@@ -2,8 +2,8 @@ type OssTenantMembersAvailabilityOptions = {
   readonly isCloud: boolean;
 };
 
-export const shouldShowOssTenantMembersTab = ({ isCloud }: OssTenantMembersAvailabilityOptions) =>
-  !isCloud;
+export const shouldShowOssTenantMembersTab = (_options: OssTenantMembersAvailabilityOptions) =>
+  false;
 
 export const getOssTenantMembersUpsellCopyKeys = () => ({
   title: 'tenants.members.card_title' as const,

@@ -9,29 +9,6 @@ type GetOssOnboardingRedirectPathOptions = {
   pathname: string;
 };
 
-const onboardingPath = 'onboarding';
-
-export const getOssOnboardingRedirectPath = ({
-  isCloud,
-  isDevFeaturesEnabled,
-  isProduction,
-  hasError,
-  isLoading,
-  isOnboardingDone,
-  tenantId,
-  pathname,
-}: GetOssOnboardingRedirectPathOptions): string | undefined => {
-  if (
-    isCloud ||
-    !isDevFeaturesEnabled ||
-    !isProduction ||
-    hasError ||
-    isLoading ||
-    isOnboardingDone ||
-    pathname.endsWith(`/${onboardingPath}`)
-  ) {
-    return;
-  }
-
-  return `/${tenantId}/${onboardingPath}`;
-};
+export const getOssOnboardingRedirectPath = (
+  _options: GetOssOnboardingRedirectPathOptions
+): string | undefined => undefined;

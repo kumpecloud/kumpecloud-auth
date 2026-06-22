@@ -1,0 +1,28 @@
+# Production deployment for KumpeCloud Auth
+
+deployment_type: docker
+assigned_username: justinkumpe
+vm_hostname: prod-vm-kumpecloud-auth
+
+authorized_admins:
+  - github.repo.admins
+
+domains:
+  - auth.kumpe.app
+  - auth-console.kumpe.app
+
+docker_compose: docker-compose.yml
+
+env_mappings:
+  NEBULA_CLIENT_TOKEN: PROD_NEBULA_CLIENT_TOKEN
+  POSTGRES_PASSWORD: PROD_AUTH_POSTGRES_PASSWORD
+  SECRET_VAULT_KEK_KEY: SECRET_VAULT_KEK_KEY
+  AUTH_ENDPOINT: PROD_AUTH_ENDPOINT
+  ADMIN_ENDPOINT: PROD_AUTH_ADMIN_ENDPOINT
+
+deploy_rules:
+  - environment: prod
+    release:
+      types:
+        - published
+      exclude_prerelease: true

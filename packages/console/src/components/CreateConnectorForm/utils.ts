@@ -72,9 +72,5 @@ type ConnectorSelectionStateOptions = {
 };
 
 export const shouldShowEmailConnectorUpsellBanner = (
-  options: ConnectorSelectionStateOptions
-): boolean => {
-  const { type, isCloud } = options;
-
-  return type === ConnectorType.Email && !isCloud;
-};
+  _options: ConnectorSelectionStateOptions
+): boolean => false;

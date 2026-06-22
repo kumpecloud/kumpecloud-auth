@@ -1,16 +1,16 @@
-# KumpeCloud Auth staging stack for kumpeapps-deploy-bot.
+# KumpeCloud Auth production stack for kumpeapps-deploy-bot.
 #
-# Required host environment variables (map via stage.yml env_mappings):
+# Required host environment variables (map via prod.yml env_mappings):
 #   POSTGRES_PASSWORD Postgres password for the auth database
-#
-# ENDPOINT / ADMIN_ENDPOINT are fixed in this file (see stage.yml domains).
+#   AUTH_ENDPOINT       Public OIDC/API URL
+#   ADMIN_ENDPOINT      Public admin console URL
 #
 # Image tags:
-#   edge    Rolling build from main (default below)
-#   stable  Latest semver release (for production; see prod/docker-compose.yml)
+#   stable  Latest semver release (updated when you push a version tag, e.g. v1.2.3)
+#   edge    Rolling build from main (used by staging)
 #
 # Optional:
-#   KUMPECLOUD_AUTH_TAG  Image tag (default: edge)
+#   KUMPECLOUD_AUTH_TAG  Override image tag (default: stable)
 #   PRIVATE_KEY_ROTATION_GRACE_PERIOD  OIDC key rotation grace period in seconds
 
 services:
@@ -32,7 +32,7 @@ services:
       start_period: 10s
 
   kumpecloud-auth:
-    image: ghcr.io/kumpecloud/kumpecloud-auth:${KUMPECLOUD_AUTH_TAG:-edge}
+    image: ghcr.io/kumpecloud/kumpecloud-auth:${KUMPECLOUD_AUTH_TAG:-stable}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -44,8 +44,8 @@ services:
     environment:
       TRUST_PROXY_HEADER: '1'
       DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/logto
-      ENDPOINT: https://auth.stage.kumpe.app
-      ADMIN_ENDPOINT: https://auth-console.stage.kumpe.app
+      ENDPOINT: ${AUTH_ENDPOINT:?AUTH_ENDPOINT is required}
+      ADMIN_ENDPOINT: ${ADMIN_ENDPOINT:?ADMIN_ENDPOINT is required}
       ALL_YES: '1'
       NO_INQUIRY: '0'
       PRIVATE_KEY_ROTATION_GRACE_PERIOD: ${PRIVATE_KEY_ROTATION_GRACE_PERIOD:-}
