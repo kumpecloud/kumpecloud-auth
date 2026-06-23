@@ -49,7 +49,7 @@ services:
       ALL_YES: '1'
       NO_INQUIRY: '0'
       PRIVATE_KEY_ROTATION_GRACE_PERIOD: ${PRIVATE_KEY_ROTATION_GRACE_PERIOD:-}
-      SECRET_VAULT_KEK_KEY: ${SECRET_VAULT_KEK_KEY:-}
+      SECRET_VAULT_KEK: ${SECRET_VAULT_KEK:-}
     entrypoint:
       - sh
       - -c
