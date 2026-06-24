@@ -8,6 +8,7 @@ const tenants = {
     members: 'Members',
     domains: 'Domains',
     oidc_configs: 'OIDC configs',
+    amember_sync: 'aMember sync',
     subscription: 'Plan and billing',
     billing_history: 'Billing history',
   },
@@ -47,6 +48,28 @@ const tenants = {
   full_env_tag: {
     development: 'Development',
     production: 'Production',
+  },
+  amember_sync: {
+    title: 'aMember sync',
+    description:
+      'Sync aMember products, users, and access into Kumpecloud Auth. Only roles prefixed with "aMember:" are managed by this integration.',
+    general_title: 'GENERAL',
+    connection_title: 'CONNECTION',
+    enabled: 'Enable automatic sync',
+    interval_seconds: 'Sync interval (seconds)',
+    sync_passwords: 'Sync password hashes from aMember',
+    identity_hint:
+      'User passkeys, social identities, MFA settings, and other Logto profile data are never modified by aMember sync.',
+    mode: 'Connection mode',
+    mode_api: 'aMember REST API',
+    mode_database: 'MariaDB / MySQL database',
+    api_url: 'API URL',
+    api_key: 'API key',
+    database_url: 'Database URL',
+    table_prefix: 'Table prefix',
+    secret_saved_placeholder: 'Saved — leave blank to keep current value',
+    run_now: 'Run sync now',
+    sync_triggered: 'aMember sync started.',
   },
   deletion_card: {
     title: 'DELETE',

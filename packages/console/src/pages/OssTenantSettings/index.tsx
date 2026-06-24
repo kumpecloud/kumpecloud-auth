@@ -22,6 +22,9 @@ function OssTenantSettings() {
         <TabNavItem href={`/tenant-settings/${TenantSettingsTabs.OidcConfigs}`}>
           <DynamicT forKey="tenants.tabs.oidc_configs" />
         </TabNavItem>
+        <TabNavItem href={`/tenant-settings/${TenantSettingsTabs.AMemberSync}`}>
+          <DynamicT forKey="tenants.tabs.amember_sync" />
+        </TabNavItem>
         {shouldShowMembersTab && (
           <TabNavItem href={`/tenant-settings/${TenantSettingsTabs.Members}`}>
             <DynamicT forKey="tenants.tabs.members" />

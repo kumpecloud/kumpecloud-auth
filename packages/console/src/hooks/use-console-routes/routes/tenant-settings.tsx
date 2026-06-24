@@ -27,6 +27,7 @@ const Invitations = safeLazy(
 const Members = safeLazy(async () => import('@/pages/TenantSettings/TenantMembers/Members'));
 const BillingHistory = safeLazy(async () => import('@/pages/TenantSettings/BillingHistory'));
 const Subscription = safeLazy(async () => import('@/pages/TenantSettings/Subscription'));
+const AMemberSyncSettings = safeLazy(async () => import('@/pages/TenantSettings/AMemberSync'));
 const OidcConfigs = safeLazy(async () => import('@/components/OidcConfigs'));
 
 const useCloudTenantSettings = () => {
@@ -64,6 +65,7 @@ const useCloudTenantSettings = () => {
         },
         { path: TenantSettingsTabs.Domains, element: <TenantDomainSettings /> },
         { path: TenantSettingsTabs.OidcConfigs, element: <OidcConfigs /> },
+        { path: TenantSettingsTabs.AMemberSync, element: <AMemberSyncSettings /> },
         !isDevTenant &&
           canManageTenant && [
             { path: TenantSettingsTabs.Subscription, element: <Subscription /> },
@@ -97,6 +99,10 @@ const useOssTenantSettings = (): RouteObject =>
         {
           path: TenantSettingsTabs.OidcConfigs,
           element: <OidcConfigs />,
+        },
+        {
+          path: TenantSettingsTabs.AMemberSync,
+          element: <AMemberSyncSettings />,
         },
         ...condArray(
           shouldShowMembersTab && [

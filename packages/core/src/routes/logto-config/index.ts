@@ -21,6 +21,7 @@ import { getConsoleLogFromContext } from '#src/utils/console.js';
 import type { ManagementApiRouter, RouterInitArgs } from '../types.js';
 
 import idTokenRoutes from './id-token.js';
+import amemberSyncRoutes from './amember-sync.js';
 import logtoConfigJwtCustomizerRoutes from './jwt-customizer.js';
 
 /**
@@ -230,4 +231,5 @@ export default function logtoConfigRoutes<T extends ManagementApiRouter>(
   logtoConfigJwtCustomizerRoutes(router, tenant);
 
   idTokenRoutes(router, tenant);
+  amemberSyncRoutes(router, tenant);
 }

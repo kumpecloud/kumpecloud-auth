@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import amember from './commands/amember/index.js';
 import connector from './commands/connector/index.js';
 import database from './commands/database/index.js';
 import install from './commands/install/index.js';
@@ -45,6 +46,7 @@ void yargs(hideBin(process.argv))
   })
   .command(install)
   .command(database)
+  .command(amember)
   .command(connector)
   .demandCommand(1)
   .showHelpOnFail(false, `Specify ${chalk.green('--help')} for available options`)

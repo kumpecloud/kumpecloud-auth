@@ -43,6 +43,7 @@ export enum TenantSettingsTabs {
   Members = 'members',
   Domains = 'domains',
   OidcConfigs = 'oidc-configs',
+  AMemberSync = 'amember-sync',
   Subscription = 'subscription',
   BillingHistory = 'billing-history',
 }

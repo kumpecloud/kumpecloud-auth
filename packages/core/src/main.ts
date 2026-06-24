@@ -11,6 +11,7 @@ import { checkPreconditions } from './env-set/preconditions.js';
 import initI18n from './i18n/init.js';
 import SystemContext from './tenants/SystemContext.js';
 import { tenantPool } from './tenants/index.js';
+import { startAMemberSyncScheduler } from './libraries/amember-sync/index.js';
 import { loadConnectorFactories } from './utils/connectors/index.js';
 import { shutdownPostHog } from './utils/posthog.js';
 
@@ -51,6 +52,7 @@ try {
   });
 
   await initApp(app);
+  startAMemberSyncScheduler();
 } catch (error: unknown) {
   consoleLog.error('Error while initializing app:');
   consoleLog.error(error);

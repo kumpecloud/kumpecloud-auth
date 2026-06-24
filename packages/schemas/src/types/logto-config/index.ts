@@ -1,4 +1,12 @@
 import { extendedIdTokenClaims } from '@logto/core-kit';
+import {
+  amemberSyncConfigPatchGuard,
+  amemberSyncConfigResponseGuard,
+  amemberSyncStoredConfigGuard,
+  type AMemberSyncConfigPatch,
+  type AMemberSyncConfigResponse,
+  type AMemberSyncStoredConfig,
+} from './amember-sync.js';
 import { type Nullable, type Optional } from '@silverhand/essentials';
 import type { ZodType } from 'zod';
 import { z } from 'zod';
@@ -12,6 +20,7 @@ import {
 
 export * from './oidc-provider.js';
 export * from './jwt-customizer.js';
+export * from './amember-sync.js';
 
 /**
  * Logto OIDC signing key types, used mainly in REST API routes.
@@ -171,6 +180,8 @@ export enum LogtoTenantConfigKey {
   IdToken = 'idToken',
   /** Tenant-scoped rotation state for staged private signing key activation. */
   SigningKeyRotationState = 'signingKeyRotationState',
+  /** aMember product/user/access sync configuration. */
+  AMemberSync = 'amemberSync',
 }
 export type LogtoTenantConfigType = {
   [LogtoTenantConfigKey.AdminConsole]: AdminConsoleData;
@@ -178,6 +189,7 @@ export type LogtoTenantConfigType = {
   [LogtoTenantConfigKey.SessionNotFoundRedirectUrl]: { url: string };
   [LogtoTenantConfigKey.IdToken]: IdTokenConfig;
   [LogtoTenantConfigKey.SigningKeyRotationState]: SigningKeyRotationState;
+  [LogtoTenantConfigKey.AMemberSync]: AMemberSyncStoredConfig;
 };
 
 export const logtoTenantConfigGuard: Readonly<{
@@ -188,6 +200,7 @@ export const logtoTenantConfigGuard: Readonly<{
   [LogtoTenantConfigKey.SessionNotFoundRedirectUrl]: z.object({ url: z.string() }),
   [LogtoTenantConfigKey.IdToken]: idTokenConfigGuard,
   [LogtoTenantConfigKey.SigningKeyRotationState]: signingKeyRotationStateGuard,
+  [LogtoTenantConfigKey.AMemberSync]: amemberSyncStoredConfigGuard,
 });
 
 /* --- Summary --- */
