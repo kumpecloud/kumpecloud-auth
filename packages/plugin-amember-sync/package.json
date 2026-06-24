@@ -1,0 +1,60 @@
+{
+  "name": "@logto/plugin-amember-sync",
+  "version": "0.1.0",
+  "description": "Sync aMember products, users, and access into Kumpecloud Auth roles and user assignments.",
+  "author": "Kumpecloud",
+  "license": "MPL-2.0",
+  "type": "module",
+  "private": true,
+  "main": "./lib/index.js",
+  "exports": "./lib/index.js",
+  "scripts": {
+    "precommit": "lint-staged",
+    "check": "tsc --noEmit",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint --ext .ts src",
+    "lint:report": "pnpm lint --format json --output-file report.json",
+    "test": "vitest run src",
+    "test:watch": "vitest src --watch",
+    "test:ci": "pnpm run test --silent --coverage",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@logto/schemas": "workspace:^",
+    "@logto/shared": "workspace:^",
+    "@silverhand/essentials": "^2.9.1",
+    "@silverhand/slonik": "31.0.0-beta.2",
+    "got": "^14.0.0",
+    "mysql2": "^3.14.0",
+    "zod": "3.24.3"
+  },
+  "devDependencies": {
+    "@silverhand/eslint-config": "6.0.1",
+    "@silverhand/ts-config": "6.0.0",
+    "@types/node": "^22.14.0",
+    "@vitest/coverage-v8": "^4.1.8",
+    "eslint": "^8.56.0",
+    "lint-staged": "^15.0.2",
+    "nock": "^14.0.3",
+    "prettier": "^3.5.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": "^22.14.0"
+  },
+  "eslintConfig": {
+    "extends": "@silverhand",
+    "settings": {
+      "import/core-modules": [
+        "@silverhand/essentials",
+        "got",
+        "mysql2",
+        "zod"
+      ]
+    }
+  },
+  "prettier": "@silverhand/eslint-config/.prettierrc"
+}

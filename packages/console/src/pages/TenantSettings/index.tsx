@@ -40,6 +40,9 @@ function TenantSettings() {
         <TabNavItem href={`/tenant-settings/${TenantSettingsTabs.OidcConfigs}`}>
           <DynamicT forKey="tenants.tabs.oidc_configs" />
         </TabNavItem>
+        <TabNavItem href={`/tenant-settings/${TenantSettingsTabs.AMemberSync}`}>
+          <DynamicT forKey="tenants.tabs.amember_sync" />
+        </TabNavItem>
         <TabNavItem href={`/tenant-settings/${TenantSettingsTabs.Members}`}>
           <DynamicT forKey="tenants.tabs.members" />
         </TabNavItem>

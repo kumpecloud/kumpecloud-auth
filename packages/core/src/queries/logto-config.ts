@@ -14,6 +14,8 @@ import {
   type LogtoOidcConfigType,
   signingKeyRotationStateGuard,
   type SigningKeyRotationState,
+  amemberSyncStoredConfigGuard,
+  type AMemberSyncStoredConfig,
 } from '@logto/schemas';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
@@ -238,6 +240,32 @@ export const createLogtoConfigQueries = (
     ['id-token-config']
   );
 
+  const getAMemberSyncConfig = async (): Promise<AMemberSyncStoredConfig | undefined> => {
+    const { rows } = await getRowsByKeys([LogtoTenantConfigKey.AMemberSync]);
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    return amemberSyncStoredConfigGuard.parse(rows[0]?.value);
+  };
+
+  const upsertAMemberSyncConfig = async (
+    patch: Partial<AMemberSyncStoredConfig>
+  ): Promise<AMemberSyncStoredConfig> => {
+    const existing = (await getAMemberSyncConfig()) ?? amemberSyncStoredConfigGuard.parse({});
+    const merged = amemberSyncStoredConfigGuard.parse({ ...existing, ...patch });
+
+    const { value } = await pool.one<{ value: unknown }>(sql`
+      insert into ${table} (${fields.key}, ${fields.value})
+        values (${LogtoTenantConfigKey.AMemberSync}, ${sql.jsonb(merged)})
+        on conflict (${fields.tenantId}, ${fields.key}) do update set ${fields.value} = ${sql.jsonb(merged)}
+        returning ${fields.value}
+    `);
+
+    return amemberSyncStoredConfigGuard.parse(value);
+  };
+
   return {
     getAdminConsoleConfig,
     updateAdminConsoleConfig,
@@ -256,5 +284,7 @@ export const createLogtoConfigQueries = (
     deleteJwtCustomizer,
     getIdTokenConfig,
     upsertIdTokenConfig,
+    getAMemberSyncConfig,
+    upsertAMemberSyncConfig,
   };
 };
