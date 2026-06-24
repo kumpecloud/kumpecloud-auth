@@ -15,7 +15,6 @@ import CirclePlus from '@/assets/icons/circle-plus.svg?react';
 import Plus from '@/assets/icons/plus.svg?react';
 import DomainSelector from '@/components/DomainSelector';
 import FormCard from '@/components/FormCard';
-import { isCloud } from '@/consts/env';
 import { customDomainFeatureLink } from '@/consts/external-links';
 import {
   openIdProviderConfigPath,
@@ -115,27 +114,25 @@ function EndpointsAndCredentials({
         targetBlank: true,
       }}
     >
-      {isCloud && (
-        <DomainSelector
-          value={selectedDomain}
-          tip={(closeTipHandler) => (
-            <Trans
-              components={{
-                a: (
-                  <TextLink
-                    targetBlank="noopener"
-                    href={getDocumentationUrl(customDomainFeatureLink)}
-                    onClick={closeTipHandler}
-                  />
-                ),
-              }}
-            >
-              {t('domain.switch_custom_domain_tip')}
-            </Trans>
-          )}
-          onChange={setSelectedDomain}
-        />
-      )}
+          <DomainSelector
+            value={selectedDomain}
+            tip={(closeTipHandler) => (
+              <Trans
+                components={{
+                  a: (
+                    <TextLink
+                      targetBlank="noopener"
+                      href={getDocumentationUrl(customDomainFeatureLink)}
+                      onClick={closeTipHandler}
+                    />
+                  ),
+                }}
+              >
+                {t('domain.switch_custom_domain_tip')}
+              </Trans>
+            )}
+            onChange={setSelectedDomain}
+          />
       {/* Hide logto endpoint field in third-party application's form. */}
       {tenantEndpoint && !isThirdParty && (
         <FormField title="application_details.logto_endpoint">

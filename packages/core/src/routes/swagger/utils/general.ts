@@ -259,34 +259,26 @@ export const validateSwaggerDocument = (document: OpenAPIV3.Document) => {
 /**
  * **CAUTION**: This function mutates the input document.
  *
- * Remove operations (path + method) that are tagged with `Cloud only` if the application is not
- * running in the cloud and remove operations with `Dev feature` tag if Logto's
- * `isDevFeaturesEnabled` flag is set to be false. It also prunes schema properties marked with
- * `x-logto-dev-feature` when dev features are disabled, and removes the internal marker when they
- * are enabled.
- *
- * This will prevent the swagger validation from failing in the OSS environment.
+ * Remove operations with `Dev feature` tag if Logto's `isDevFeaturesEnabled` flag is set to false.
+ * It also prunes schema properties marked with `x-logto-dev-feature` when dev features are
+ * disabled, and removes the internal marker when they are enabled.
  *
  */
 // eslint-disable-next-line complexity
 export const removeUnnecessaryOperations = (
   document: DeepPartial<OpenAPIV3.Document>
 ): DeepPartial<OpenAPIV3.Document> => {
-  const { isCloud, isDevFeaturesEnabled } = EnvSet.values;
+  const { isDevFeaturesEnabled } = EnvSet.values;
 
   removeDevFeatureSchemaProperties(document);
 
-  if ((isCloud && isDevFeaturesEnabled) || !document.paths) {
+  if (isDevFeaturesEnabled || !document.paths) {
     return document;
   }
 
   for (const [path, pathItem] of Object.entries(document.paths)) {
     for (const method of Object.values(OpenAPIV3.HttpMethods)) {
-      if (
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        (!isCloud && pathItem?.[method]?.tags?.includes(cloudOnlyTag)) ||
-        (!isDevFeaturesEnabled && pathItem?.[method]?.tags?.includes(devFeatureTag))
-      ) {
+      if (pathItem?.[method]?.tags?.includes(devFeatureTag)) {
         // eslint-disable-next-line @silverhand/fp/no-delete, @typescript-eslint/no-dynamic-delete -- intended
         delete pathItem[method];
       }

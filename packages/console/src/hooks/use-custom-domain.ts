@@ -4,16 +4,13 @@ import { useCallback, useContext, useMemo } from 'react';
 import useSWR from 'swr';
 
 import { customDomainSyncInterval } from '@/consts/custom-domain';
-import { isCloud } from '@/consts/env';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import { TenantsContext } from '@/contexts/TenantsProvider';
 
 import { type RequestError } from './use-api';
 
 const useCustomDomain = (autoSync = false) => {
-  const { data, error, mutate } = useSWR<Domain[], RequestError>(
-    isCloud && 'api/domains',
-    conditional(
+  const { data, error, mutate } = useSWR<Domain[], RequestError>('api/domains', conditional(
       autoSync && {
         refreshInterval: customDomainSyncInterval * 1000,
       }

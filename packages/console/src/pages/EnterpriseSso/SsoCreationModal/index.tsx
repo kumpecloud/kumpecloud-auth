@@ -16,7 +16,6 @@ import ContactUsPhraseLink from '@/components/ContactUsPhraseLink';
 import Skeleton from '@/components/CreateConnectorForm/Skeleton';
 import { getConnectorRadioGroupSize } from '@/components/CreateConnectorForm/utils';
 import QuotaGuardFooter from '@/components/QuotaGuardFooter';
-import { isCloud } from '@/consts/env';
 import { addOnPricingExplanationLink } from '@/consts/external-links';
 import { enterpriseSsoAddOnUnitPrice, latestProPlanId } from '@/consts/subscriptions';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
@@ -60,7 +59,6 @@ function SsoCreationModal({ isOpen, onClose: rawOnClose }: Props) {
   const [selectedProviderName, setSelectedProviderName] = useState<string>();
 
   const isSsoEnabled =
-    !isCloud ||
     currentSubscriptionQuota.enterpriseSsoLimit === null ||
     currentSubscriptionQuota.enterpriseSsoLimit > 0;
 

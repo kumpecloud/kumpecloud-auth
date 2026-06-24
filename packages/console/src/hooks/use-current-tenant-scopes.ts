@@ -29,15 +29,23 @@ const useCurrentTenantScopes = () => {
     }
   );
 
-  const access = useMemo(
-    () => ({
+  const access = useMemo(() => {
+    if (!isCloud) {
+      return {
+        canInviteMember: true,
+        canRemoveMember: true,
+        canUpdateMemberRole: true,
+        canManageTenant: true,
+      };
+    }
+
+    return {
       canInviteMember: Boolean(scopes?.includes(TenantScope.InviteMember)),
       canRemoveMember: Boolean(scopes?.includes(TenantScope.RemoveMember)),
       canUpdateMemberRole: Boolean(scopes?.includes(TenantScope.UpdateMemberRole)),
       canManageTenant: Boolean(scopes?.includes(TenantScope.ManageTenant)),
-    }),
-    [scopes]
-  );
+    };
+  }, [scopes]);
 
   return useMemo(
     () => ({

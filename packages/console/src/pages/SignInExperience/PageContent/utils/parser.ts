@@ -202,13 +202,7 @@ export const sieFormDataParser = {
       },
     };
   },
-  toSignInExperience: (
-    formData: SignInExperienceForm,
-    {
-      isCloud = true,
-      isCustomUiCspEnabled = false,
-    }: { isCloud?: boolean; isCustomUiCspEnabled?: boolean } = {}
-  ): SignInExperiencePageManagedData => {
+  toSignInExperience: (formData: SignInExperienceForm): SignInExperiencePageManagedData => {
     const {
       branding,
       createAccountEnabled,
@@ -220,6 +214,8 @@ export const sieFormDataParser = {
       hideLogtoBranding,
       ...rest
     } = formData;
+
+    const normalizedCustomUiCsp = normalizeCustomUiCspForSubmit(customUiCsp);
 
     return {
       ...rest,
@@ -233,11 +229,11 @@ export const sieFormDataParser = {
       signInMode: createAccountEnabled ? SignInMode.SignInAndRegister : SignInMode.SignIn,
       customCss: customCss?.length ? customCss : null,
       ...conditional(
-        isCustomUiCspEnabled && {
-          customUiCsp: normalizeCustomUiCspForSubmit(customUiCsp),
+        Object.keys(normalizedCustomUiCsp).length > 0 && {
+          customUiCsp: normalizedCustomUiCsp,
         }
       ),
-      ...conditional(isCloud && { hideLogtoBranding }),
+      hideLogtoBranding,
     };
   },
 };
@@ -265,11 +261,7 @@ export const sieFormDataParser = {
  * - `usernamePolicy`
  */
 export const signInExperienceToUpdatedDataParser = (
-  data: SignInExperience,
-  {
-    isCloud = true,
-    isCustomUiCspEnabled = false,
-  }: { isCloud?: boolean; isCustomUiCspEnabled?: boolean } = {}
+  data: SignInExperience
 ): SignInExperiencePageManagedData => {
   const {
     signUp,
@@ -288,18 +280,20 @@ export const signInExperienceToUpdatedDataParser = (
     ...rest
   } = data;
 
-  return {
-    ...rest,
-    signUp: {
-      ...signUp,
-      secondaryIdentifiers: signUp.secondaryIdentifiers ?? [],
-    },
-    signUpProfileFields: rest.signUpProfileFields,
-    ...conditional(
-      isCustomUiCspEnabled && {
-        customUiCsp: normalizeCustomUiCspForSubmit(normalizeCustomUiCspForForm(customUiCsp)),
-      }
-    ),
-    ...conditional(isCloud && { hideLogtoBranding }),
-  };
+    const normalizedCustomUiCsp = normalizeCustomUiCspForSubmit(normalizeCustomUiCspForForm(customUiCsp));
+
+    return {
+      ...rest,
+      signUp: {
+        ...signUp,
+        secondaryIdentifiers: signUp.secondaryIdentifiers ?? [],
+      },
+      signUpProfileFields: rest.signUpProfileFields,
+      ...conditional(
+        Object.keys(normalizedCustomUiCsp).length > 0 && {
+          customUiCsp: normalizedCustomUiCsp,
+        }
+      ),
+      hideLogtoBranding,
+    };
 };

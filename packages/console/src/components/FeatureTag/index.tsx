@@ -1,8 +1,6 @@
 import { ReservedPlanId } from '@logto/schemas';
 import classNames from 'classnames';
 import { useContext } from 'react';
-
-import { isCloud } from '@/consts/env';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import { TenantsContext } from '@/contexts/TenantsProvider';
 import { isProPlan } from '@/utils/subscription';
@@ -135,7 +133,7 @@ export function CombinedAddOnAndFeatureTag(props: CombinedAddOnAndFeatureTagProp
   }
 
   // Show the "Add-on" tag for Pro plan.
-  if (hasAddOnTag && isCloud && isProPlan(planId)) {
+  if (hasAddOnTag && isProPlan(planId)) {
     return (
       <div className={classNames(styles.tag, styles.beta, styles.addOn, className)}>
         {addOnLabel}
@@ -143,7 +141,7 @@ export function CombinedAddOnAndFeatureTag(props: CombinedAddOnAndFeatureTagProp
     );
   }
 
-  if (paywall && isCloud) {
+  if (paywall) {
     return <FeatureTag isVisible plan={paywall} />;
   }
 

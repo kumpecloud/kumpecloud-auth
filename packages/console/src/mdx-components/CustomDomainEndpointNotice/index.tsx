@@ -1,4 +1,3 @@
-import { isCloud } from '@/consts/env';
 import InlineNotification from '@/ds-components/InlineNotification';
 import TextLink from '@/ds-components/TextLink';
 
@@ -7,10 +6,6 @@ type Props = {
 };
 
 function CustomDomainEndpointNotice({ variant = 'access' }: Props) {
-  if (!isCloud) {
-    return null;
-  }
-
   return (
     <InlineNotification>
       After adding{' '}

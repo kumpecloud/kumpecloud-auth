@@ -3,7 +3,6 @@ import { useCallback, useContext } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import ContactUsPhraseLink from '@/components/ContactUsPhraseLink';
-import { isCloud } from '@/consts/env';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import Button from '@/ds-components/Button';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
@@ -24,7 +23,7 @@ function CreateButton({ isDisabled, tokenType }: Props) {
 
   const { currentSubscriptionQuota } = useContext(SubscriptionDataContext);
 
-  const isCustomJwtEnabled = !isCloud || currentSubscriptionQuota.customJwtEnabled;
+  const isCustomJwtEnabled = currentSubscriptionQuota.customJwtEnabled;
 
   const onCreateButtonClick = useCallback(async () => {
     if (isCustomJwtEnabled) {
