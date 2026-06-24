@@ -6,8 +6,14 @@
   "license": "MPL-2.0",
   "type": "module",
   "private": true,
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    }
+  },
   "main": "./lib/index.js",
-  "exports": "./lib/index.js",
   "scripts": {
     "precommit": "lint-staged",
     "check": "tsc --noEmit",
