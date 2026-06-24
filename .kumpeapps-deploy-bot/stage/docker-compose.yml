@@ -48,6 +48,7 @@ services:
       ADMIN_ENDPOINT: https://auth-console.stage.kumpe.app
       ALL_YES: '1'
       NO_INQUIRY: '0'
+      DEV_FEATURES_ENABLED: '1'
       PRIVATE_KEY_ROTATION_GRACE_PERIOD: ${PRIVATE_KEY_ROTATION_GRACE_PERIOD:-}
       SECRET_VAULT_KEK: ${SECRET_VAULT_KEK:-}
     entrypoint:

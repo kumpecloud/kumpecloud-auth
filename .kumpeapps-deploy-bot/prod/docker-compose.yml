@@ -43,6 +43,7 @@ services:
       - '3002:3002'
     environment:
       TRUST_PROXY_HEADER: '1'
+      DEV_FEATURES_ENABLED: '1'
       DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/logto
       ENDPOINT: ${AUTH_ENDPOINT:?AUTH_ENDPOINT is required}
       ADMIN_ENDPOINT: ${ADMIN_ENDPOINT:?ADMIN_ENDPOINT is required}
