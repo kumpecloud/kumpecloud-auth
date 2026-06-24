@@ -8,7 +8,6 @@ import ReactModal from 'react-modal';
 import AddOnNoticeFooter from '@/components/AddOnNoticeFooter';
 import ContactUsPhraseLink from '@/components/ContactUsPhraseLink';
 import QuotaGuardFooter from '@/components/QuotaGuardFooter';
-import { isCloud } from '@/consts/env';
 import { addOnPricingExplanationLink } from '@/consts/external-links';
 import { latestProPlanId, organizationAddOnUnitPrice } from '@/consts/subscriptions';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
@@ -43,9 +42,7 @@ function CreateOrganizationModal({ isOpen, onClose }: Props) {
   } = useUserPreferences();
   const isPaidTenant = isPaidPlan(planId, isEnterprisePlan);
   const isOrganizationsDisabled =
-    // Check if the organizations feature is disabled except for paid tenants.
-    // Paid tenants can create organizations with organization feature add-on applied to their subscription.
-    isCloud && !isFeatureEnabled(currentSubscriptionQuota.organizationsLimit) && !isPaidTenant;
+    !isFeatureEnabled(currentSubscriptionQuota.organizationsLimit) && !isPaidTenant;
 
   const {
     reset,

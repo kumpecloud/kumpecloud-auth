@@ -2,7 +2,6 @@ import { conditionalString } from '@silverhand/essentials';
 import { useTranslation } from 'react-i18next';
 
 import DomainSelector from '@/components/DomainSelector';
-import { isCloud } from '@/consts/env';
 import CopyToClipboard from '@/ds-components/CopyToClipboard';
 import FormField from '@/ds-components/FormField';
 import useDomainSelection from '@/hooks/use-domain-selection';
@@ -25,13 +24,11 @@ function SamlConnectorSpInfo({ samlProviderConfig }: Props) {
    */
   return (
     <>
-      {isCloud && (
-        <DomainSelector
-          tip={t('domain.switch_saml_connector_domain_tip')}
-          value={selectedDomain}
-          onChange={setSelectedDomain}
-        />
-      )}
+      <DomainSelector
+        tip={t('domain.switch_saml_connector_domain_tip')}
+        value={selectedDomain}
+        onChange={setSelectedDomain}
+      />
       <FormField title="enterprise_sso.basic_info.saml.acs_url_field_name">
         <div className={styles.uriContent}>
           <CopyToClipboard

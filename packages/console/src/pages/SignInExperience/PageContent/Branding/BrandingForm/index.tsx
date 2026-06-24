@@ -5,7 +5,6 @@ import { Controller, useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import LogoAndFavicon from '@/components/ImageInputs/LogoAndFavicon';
-import { isCloud } from '@/consts/env';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import Button from '@/ds-components/Button';
 import Card from '@/ds-components/Card';
@@ -24,7 +23,6 @@ function BrandingForm() {
   const {
     watch,
     register,
-    unregister,
     setValue,
     control,
     formState: { errors, isDirty },
@@ -54,12 +52,6 @@ function BrandingForm() {
       handleResetColor();
     }
   }, [handleResetColor, isDarkModeEnabled, isDirty]);
-
-  useEffect(() => {
-    if (!isCloud) {
-      unregister('hideLogtoBranding');
-    }
-  }, [unregister]);
 
   return (
     <Card>
@@ -126,7 +118,7 @@ function BrandingForm() {
         </>
       )}
       <HideLogtoBrandingField
-        variant={isCloud ? 'cloud' : 'oss'}
+        variant="cloud"
         isEnabledInCloud={isHideLogtoBrandingEnabled}
       />
     </Card>

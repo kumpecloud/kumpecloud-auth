@@ -348,26 +348,6 @@ export default function signInExperiencesRoutes<T extends ManagementApiRouter>(
         );
       }
 
-      // Guard the quota for BYUI if the hideLogtoBranding is set to true
-      if (hideLogtoBranding) {
-        // Hide Logto branding is only available for Logto Cloud
-        assertThat(
-          EnvSet.values.isCloud,
-          new RequestError({
-            code: 'request.invalid_input',
-            details: 'Hide Logto branding is not supported in this environment',
-          })
-        );
-      }
-      if (hasCustomUiCsp) {
-        assertThat(
-          EnvSet.values.isCloud,
-          new RequestError({
-            code: 'request.invalid_input',
-            details: 'Custom UI CSP configuration is not available',
-          })
-        );
-      }
       if (hideLogtoBranding === true || hasCustomUiCsp) {
         await quota.guardTenantUsageByKey('bringYourUiEnabled');
       }

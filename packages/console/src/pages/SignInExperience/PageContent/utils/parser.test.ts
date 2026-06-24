@@ -105,8 +105,7 @@ describe('sign-in experience parser', () => {
           scriptSrc: [' ', ' https://scripts.example.com '],
           connectSrc: [''],
         },
-      },
-      { isCustomUiCspEnabled: true }
+      }
     );
 
     expect(payload.customUiCsp).toEqual({
@@ -114,20 +113,11 @@ describe('sign-in experience parser', () => {
     });
   });
 
-  it('omits Custom UI CSP when the feature is not enabled for the current tenant', () => {
-    const formData = sieFormDataParser.fromSignInExperience({
-      ...mockSignInExperience,
-      customUiCsp: {
-        scriptSrc: ['https://scripts.example.com'],
-      },
-    });
+  it('omits empty Custom UI CSP directive arrays before submit and compare', () => {
+    const formData = sieFormDataParser.fromSignInExperience(mockSignInExperience);
 
-    const submitPayload = sieFormDataParser.toSignInExperience(formData, {
-      isCustomUiCspEnabled: false,
-    });
-    const comparePayload = signInExperienceToUpdatedDataParser(mockSignInExperience, {
-      isCustomUiCspEnabled: false,
-    });
+    const submitPayload = sieFormDataParser.toSignInExperience(formData);
+    const comparePayload = signInExperienceToUpdatedDataParser(mockSignInExperience);
 
     expect(submitPayload).not.toHaveProperty('customUiCsp');
     expect(comparePayload).not.toHaveProperty('customUiCsp');
@@ -144,17 +134,12 @@ describe('sign-in experience parser', () => {
     });
 
     expect(formData.customUiCsp).toEqual(customUiCsp);
+    expect(sieFormDataParser.toSignInExperience(formData).customUiCsp).toEqual(customUiCsp);
     expect(
-      sieFormDataParser.toSignInExperience(formData, { isCustomUiCspEnabled: true }).customUiCsp
-    ).toEqual(customUiCsp);
-    expect(
-      signInExperienceToUpdatedDataParser(
-        {
-          ...mockSignInExperience,
-          customUiCsp,
-        },
-        { isCustomUiCspEnabled: true }
-      ).customUiCsp
+      signInExperienceToUpdatedDataParser({
+        ...mockSignInExperience,
+        customUiCsp,
+      }).customUiCsp
     ).toEqual(customUiCsp);
   });
 
@@ -233,12 +218,12 @@ describe('sign-in experience parser', () => {
     expect(sieFormDataParser.toSignInExperience(formData).signUpProfileFields).toEqual([]);
   });
 
-  it('should omit hideLogtoBranding from OSS payloads', () => {
+  it('should include hideLogtoBranding in payloads', () => {
     const formData = sieFormDataParser.fromSignInExperience(mockSignInExperience);
 
-    const payload = sieFormDataParser.toSignInExperience(formData, { isCloud: false });
+    const payload = sieFormDataParser.toSignInExperience(formData);
 
-    expect(payload).not.toHaveProperty('hideLogtoBranding');
+    expect(payload).toHaveProperty('hideLogtoBranding');
   });
 
   it('should convert merged sign-up identifiers back to sign-up schema', () => {
@@ -288,12 +273,10 @@ describe('sign-in experience parser', () => {
     ).toEqual([]);
   });
 
-  it('should omit hideLogtoBranding from OSS compare payloads', () => {
-    const comparePayload = signInExperienceToUpdatedDataParser(mockSignInExperience, {
-      isCloud: false,
-    });
+  it('should include hideLogtoBranding in compare payloads', () => {
+    const comparePayload = signInExperienceToUpdatedDataParser(mockSignInExperience);
 
-    expect(comparePayload).not.toHaveProperty('hideLogtoBranding');
+    expect(comparePayload).toHaveProperty('hideLogtoBranding');
   });
 
   it('should support legacy social and passkey data defaults', () => {

@@ -5,7 +5,6 @@ import { useContext } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { isCloud } from '@/consts/env';
 import { customDomainFeatureLink } from '@/consts/external-links';
 import { AppDataContext } from '@/contexts/AppDataProvider';
 import CodeEditor from '@/ds-components/CodeEditor';
@@ -62,23 +61,21 @@ function ConfigForm({
               ((closeTipHandler) => (
                 <>
                   <p>{t('connectors.guide.callback_uri_description')}</p>
-                  {isCloud && (
-                    <p>
-                      <Trans
-                        components={{
-                          a: (
-                            <TextLink
-                              href={getDocumentationUrl(customDomainFeatureLink)}
-                              targetBlank="noopener"
-                              onClick={closeTipHandler}
-                            />
-                          ),
-                        }}
-                      >
-                        {t('connectors.guide.callback_uri_custom_domain_description')}
-                      </Trans>
-                    </p>
-                  )}
+                  <p>
+                    <Trans
+                      components={{
+                        a: (
+                          <TextLink
+                            href={getDocumentationUrl(customDomainFeatureLink)}
+                            targetBlank="noopener"
+                            onClick={closeTipHandler}
+                          />
+                        ),
+                      }}
+                    >
+                      {t('connectors.guide.callback_uri_custom_domain_description')}
+                    </Trans>
+                  </p>
                 </>
               ))
           )}

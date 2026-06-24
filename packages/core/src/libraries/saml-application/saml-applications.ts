@@ -155,8 +155,7 @@ export const createSamlApplicationsLibrary = (queries: Queries) => {
     currentTenantId: string,
     domains: Domain[]
   ) => {
-    // Skip for admin tenant and non-cloud environment.
-    if (currentTenantId === adminTenantId || !EnvSet.values.isCloud) {
+    if (currentTenantId === adminTenantId) {
       return;
     }
 

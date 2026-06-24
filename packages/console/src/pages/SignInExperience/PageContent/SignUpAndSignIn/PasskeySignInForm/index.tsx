@@ -4,7 +4,6 @@ import { useFormContext, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import InlineUpsell from '@/components/InlineUpsell';
-import { isCloud } from '@/consts/env';
 import { latestProPlanId } from '@/consts/subscriptions';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import Card from '@/ds-components/Card';
@@ -26,7 +25,7 @@ function PasskeySignInForm() {
     currentSubscriptionQuota,
     currentSubscription: { planId, isEnterprisePlan },
   } = useContext(SubscriptionDataContext);
-  const isPasskeySignInEnabled = currentSubscriptionQuota.passkeySignInEnabled || !isCloud;
+  const isPasskeySignInEnabled = currentSubscriptionQuota.passkeySignInEnabled;
   const isPaidTenant = isPaidPlan(planId, isEnterprisePlan);
   const watchEnableSwitch = watch('passkeySignIn.enabled');
 
@@ -36,7 +35,7 @@ function PasskeySignInForm() {
       <FormField
         title="sign_in_exp.sign_up_and_sign_in.passkey_sign_in.passkey_sign_in"
         featureTag={cond(
-          isCloud && {
+          !isPasskeySignInEnabled && {
             isVisible: !isPaidTenant,
             plan: latestProPlanId,
           }

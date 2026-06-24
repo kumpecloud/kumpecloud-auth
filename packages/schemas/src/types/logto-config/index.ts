@@ -193,7 +193,11 @@ export type LogtoTenantConfigType = {
 };
 
 export const logtoTenantConfigGuard: Readonly<{
-  [key in LogtoTenantConfigKey]: ZodType<LogtoTenantConfigType[key]>;
+  [key in LogtoTenantConfigKey]: ZodType<
+    LogtoTenantConfigType[key],
+    z.ZodTypeDef,
+    unknown
+  >;
 }> = Object.freeze({
   [LogtoTenantConfigKey.AdminConsole]: adminConsoleDataGuard,
   [LogtoTenantConfigKey.CloudConnection]: cloudConnectionDataGuard,

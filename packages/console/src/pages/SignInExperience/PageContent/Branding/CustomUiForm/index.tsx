@@ -3,7 +3,6 @@ import { Controller, useFormContext } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
 
 import CustomCssEditorField from '@/components/CustomCssEditorField';
-import { isCloud } from '@/consts/env';
 import { latestProPlanId } from '@/consts/subscriptions';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import Card from '@/ds-components/Card';
@@ -22,7 +21,7 @@ function CustomUiForm() {
   const { getDocumentationUrl } = useDocumentationUrl();
   const { control } = useFormContext<SignInExperienceForm>();
   const { currentSubscriptionQuota } = useContext(SubscriptionDataContext);
-  const isBringYourUiEnabled = isCloud ? currentSubscriptionQuota.bringYourUiEnabled : true;
+  const isBringYourUiEnabled = currentSubscriptionQuota.bringYourUiEnabled;
 
   return (
     <>
@@ -34,7 +33,7 @@ function CustomUiForm() {
         <FormSectionTitle
           title="custom_ui.bring_your_ui_title"
           featureTag={{
-            isVisible: isCloud && !isBringYourUiEnabled,
+            isVisible: !isBringYourUiEnabled,
             plan: latestProPlanId,
           }}
         />

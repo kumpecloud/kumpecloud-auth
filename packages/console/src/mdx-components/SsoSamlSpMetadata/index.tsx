@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import DomainSelector from '@/components/DomainSelector';
-import { isCloud } from '@/consts/env';
 import { SsoConnectorContext } from '@/contexts/SsoConnectorContextProvider';
 import CopyToClipboard from '@/ds-components/CopyToClipboard';
 import FormField from '@/ds-components/FormField';
@@ -50,14 +49,12 @@ function SsoSamlSpMetadata() {
 
   return (
     <div>
-      {isCloud && (
-        <DomainSelector
-          value={selectedDomain}
-          className={styles.domainSelector}
-          tip={t('domain.switch_saml_connector_domain_tip')}
-          onChange={setSelectedDomain}
-        />
-      )}
+      <DomainSelector
+        value={selectedDomain}
+        className={styles.domainSelector}
+        tip={t('domain.switch_saml_connector_domain_tip')}
+        onChange={setSelectedDomain}
+      />
       <FormField
         title="enterprise_sso.basic_info.saml.audience_uri_field_name"
         className={styles.inputField}
