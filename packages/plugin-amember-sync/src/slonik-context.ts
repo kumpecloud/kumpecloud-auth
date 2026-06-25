@@ -14,6 +14,10 @@ import { sql } from '@silverhand/slonik';
 
 const convertToTable = (table: string) => sql.identifier([table]);
 
+/** Postgres `timestamptz` from JS epoch milliseconds (matches core `convertToPrimitiveOrSql`). */
+const toTimestampFromMs = (milliseconds: number) =>
+  sql`to_timestamp(${milliseconds}::double precision / 1000)`;
+
 export const createSlonikAMemberSyncContext = (
   pool: CommonQueryMethods,
   tenantId: string,
@@ -158,7 +162,7 @@ export const createSlonikAMemberSyncContext = (
           ${sql.jsonb(buildAMemberCustomData(user.userId))},
           ${passwordEncrypted},
           ${passwordEncryptionMethod},
-          ${passwordEncrypted ? Date.now() : null}
+          ${passwordEncrypted ? toTimestampFromMs(Date.now()) : null}
         )
       `);
 
@@ -214,7 +218,7 @@ export const createSlonikAMemberSyncContext = (
             else password_encryption_method
           end,
           password_updated_at = case
-            when ${shouldUpdatePassword} then ${Date.now()}
+            when ${shouldUpdatePassword} then ${toTimestampFromMs(Date.now())}
             else password_updated_at
           end
         where tenant_id = ${tenantId}

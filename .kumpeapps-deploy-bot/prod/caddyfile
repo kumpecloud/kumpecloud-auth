@@ -1,11 +1,11 @@
 # OIDC API, sign-in experience, and token endpoints
 auth.kumpe.app {
 	import ssl_defaults
-	reverse_proxy {{nebula.ip}}:3001
+	reverse_proxy 172.24.0.38:3001
 }
 
 # Admin console
 auth-console.kumpe.app {
 	import ssl_defaults
-	reverse_proxy {{nebula.ip}}:3002
+	reverse_proxy 172.24.0.38:3002
 }
