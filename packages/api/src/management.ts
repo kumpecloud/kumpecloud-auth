@@ -50,7 +50,7 @@ export type CreateApiClientOptions = {
  * @param tenantId The tenant ID to construct the base URL.
  * @returns The base URL for the Management API.
  */
-export const getBaseUrl = (tenantId: string) => `https://${tenantId}.logto.app`;
+export const getBaseUrl = (tenantId: string) => `https://${tenantId}.kumpe.app`;
 
 /**
  * Returns the API indicator for the Management API based on the tenant ID.
@@ -159,7 +159,7 @@ type ManagementApiReturnType = {
  *   clientId: 'my-client-id',
  *   clientSecret: 'my-client-secret',
  *   baseUrl: 'https://my-oss-logto-instance.com',
- *   apiIndicator: 'https://default.logto.app/api',
+ *   apiIndicator: 'https://default.kumpe.app/api',
  * });
  * ```
  */

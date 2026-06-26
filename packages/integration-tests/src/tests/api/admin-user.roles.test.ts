@@ -99,7 +99,7 @@ describe('admin console user management (roles)', () => {
     const m2mApp = await createApplication(generateTestName(), ApplicationType.MachineToMachine);
     const [managementApiRole] = await getRoles({
       type: RoleType.MachineToMachine,
-      search: '%Logto Management API access%',
+      search: '%KumpeCloud Management API access%',
     });
 
     if (!managementApiRole) {
