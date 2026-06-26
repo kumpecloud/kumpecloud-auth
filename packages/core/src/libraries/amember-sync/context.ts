@@ -9,7 +9,7 @@ import {
   buildAMemberCustomData,
   getAMemberUserIdFromCustomData,
   normalizeBcryptHash,
-  resolveAMemberUserEmail,
+  resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from '@logto/plugin-amember-sync';
 import { RoleType, Roles, Users, UsersPasswordEncryptionMethod, type Role } from '@logto/schemas';
@@ -45,20 +45,27 @@ export const createAMemberSyncContext = (
       select
         ${userFields.id},
         ${userFields.primaryEmail},
+        ${userFields.username},
         ${userFields.customData},
         ${userFields.passwordEncrypted},
         ${userFields.passwordEncryptionMethod}
       from ${usersTable}
       where ${userFields.primaryEmail} is not null
+        or ${userFields.username} is not null
         or ${userFields.customData} ? 'amember'
     `);
 
     const byEmail = new Map<string, LogtoUserRecord>();
+    const byUsername = new Map<string, LogtoUserRecord>();
     const byAMemberUserId = new Map<number, LogtoUserRecord>();
 
     for (const user of users) {
       if (user.primaryEmail) {
         byEmail.set(user.primaryEmail.toLowerCase(), user);
+      }
+
+      if (user.username) {
+        byUsername.set(user.username.toLowerCase(), user);
       }
 
       const amemberUserId = getAMemberUserIdFromCustomData(user.customData);
@@ -68,7 +75,7 @@ export const createAMemberSyncContext = (
       }
     }
 
-    return { byEmail, byAMemberUserId };
+    return { byEmail, byUsername, byAMemberUserId };
   };
 
   const buildPasswordPayload = (user: AMemberUser, existing?: LogtoUserRecord) => {
@@ -105,15 +112,16 @@ export const createAMemberSyncContext = (
     },
     findUsersIndexed,
     createUserFromAMember: async (user) => {
-      const email = resolveAMemberUserEmail(user);
+      const identity = resolveAMemberUserIdentity(user);
 
-      if (!email) {
-        throw new Error(`Cannot create user without email for aMember user ${user.userId}`);
+      if (!identity || (!identity.email && !identity.username)) {
+        throw new Error(`Cannot create user without login for aMember user ${user.userId}`);
       }
 
       const [created] = await insertUser({
         id: await generateUserId(),
-        primaryEmail: email,
+        primaryEmail: identity.email,
+        username: identity.username,
         name: user.name,
         customData: buildAMemberCustomData(user.userId),
         ...buildPasswordPayload(user),
@@ -122,15 +130,16 @@ export const createAMemberSyncContext = (
       return {
         id: created.id,
         primaryEmail: created.primaryEmail,
+        username: created.username,
         customData: (created.customData ?? {}) as Record<string, unknown>,
         passwordEncrypted: created.passwordEncrypted,
         passwordEncryptionMethod: created.passwordEncryptionMethod,
       };
     },
     updateUserFromAMember: async (userId, user) => {
-      const email = resolveAMemberUserEmail(user);
+      const identity = resolveAMemberUserIdentity(user);
 
-      if (!email) {
+      if (!identity) {
         return;
       }
 
@@ -139,7 +148,8 @@ export const createAMemberSyncContext = (
       const passwordPayload = buildPasswordPayload(user, existing);
 
       await updateUserById(userId, {
-        primaryEmail: email,
+        primaryEmail: identity.email,
+        username: identity.username,
         name: user.name,
         customData: buildAMemberCustomData(
           user.userId,

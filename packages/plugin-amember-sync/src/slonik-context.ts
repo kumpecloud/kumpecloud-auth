@@ -4,11 +4,11 @@ import {
   buildAMemberCustomData,
   getAMemberUserIdFromCustomData,
   normalizeBcryptHash,
-  resolveAMemberUserEmail,
+  resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from './utils.js';
 import { RoleType, UsersPasswordEncryptionMethod, type Role } from '@logto/schemas';
-import { generateStandardId } from '@logto/shared';
+import { generateStandardId, generateStandardShortId } from '@logto/shared';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
@@ -40,6 +40,7 @@ export const createSlonikAMemberSyncContext = (
       select
         id,
         primary_email as "primaryEmail",
+        username,
         custom_data as "customData",
         password_encrypted as "passwordEncrypted",
         password_encryption_method as "passwordEncryptionMethod"
@@ -47,16 +48,22 @@ export const createSlonikAMemberSyncContext = (
       where tenant_id = ${tenantId}
         and (
           primary_email is not null
+          or username is not null
           or custom_data ? 'amember'
         )
     `);
 
     const byEmail = new Map<string, LogtoUserRecord>();
+    const byUsername = new Map<string, LogtoUserRecord>();
     const byAMemberUserId = new Map<number, LogtoUserRecord>();
 
     for (const user of users) {
       if (user.primaryEmail) {
         byEmail.set(user.primaryEmail.toLowerCase(), user);
+      }
+
+      if (user.username) {
+        byUsername.set(user.username.toLowerCase(), user);
       }
 
       const amemberUserId = getAMemberUserIdFromCustomData(user.customData);
@@ -66,7 +73,7 @@ export const createSlonikAMemberSyncContext = (
       }
     }
 
-    return { byEmail, byAMemberUserId };
+    return { byEmail, byUsername, byAMemberUserId };
   };
 
   const assignDefaultRoles = async (userId: string) => {
@@ -128,13 +135,13 @@ export const createSlonikAMemberSyncContext = (
     },
     findUsersIndexed,
     createUserFromAMember: async (user) => {
-      const email = resolveAMemberUserEmail(user);
+      const identity = resolveAMemberUserIdentity(user);
 
-      if (!email) {
-        throw new Error(`Cannot create user without email for aMember user ${user.userId}`);
+      if (!identity || (!identity.email && !identity.username)) {
+        throw new Error(`Cannot create user without login for aMember user ${user.userId}`);
       }
 
-      const userId = generateStandardId();
+      const userId = generateStandardShortId();
       const passwordEncrypted =
         syncPasswords && user.passwordHash
           ? normalizeBcryptHash(user.passwordHash)
@@ -148,6 +155,7 @@ export const createSlonikAMemberSyncContext = (
           tenant_id,
           id,
           primary_email,
+          username,
           name,
           custom_data,
           password_encrypted,
@@ -157,7 +165,8 @@ export const createSlonikAMemberSyncContext = (
         values (
           ${tenantId},
           ${userId},
-          ${email},
+          ${identity.email ?? null},
+          ${identity.username ?? null},
           ${user.name ?? null},
           ${sql.jsonb(buildAMemberCustomData(user.userId))},
           ${passwordEncrypted},
@@ -170,16 +179,17 @@ export const createSlonikAMemberSyncContext = (
 
       return {
         id: userId,
-        primaryEmail: email,
+        primaryEmail: identity.email ?? null,
+        username: identity.username ?? null,
         customData: buildAMemberCustomData(user.userId),
         passwordEncrypted,
         passwordEncryptionMethod,
       };
     },
     updateUserFromAMember: async (userId, user) => {
-      const email = resolveAMemberUserEmail(user);
+      const identity = resolveAMemberUserIdentity(user);
 
-      if (!email) {
+      if (!identity) {
         return;
       }
 
@@ -202,7 +212,8 @@ export const createSlonikAMemberSyncContext = (
       await pool.query(sql`
         update ${usersTable}
         set
-          primary_email = ${email},
+          primary_email = ${identity.email ?? null},
+          username = ${identity.username ?? null},
           name = ${user.name ?? null},
           custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb({
             amember: {

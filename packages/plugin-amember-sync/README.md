@@ -7,7 +7,7 @@ Sync aMember products, users, and access records into Kumpecloud Auth (Logto for
 | aMember | Kumpecloud Auth |
 |---------|-----------------|
 | Products | User roles named `aMember: {product_id}` with description set to the product title |
-| Users (email/login + bcrypt password hash) | Users matched by email, with `customData.amember.userId` stored for linkage |
+| Users (email/login + bcrypt password hash) | Users matched by email or username (`login`), with `customData.amember.userId` stored for linkage |
 | Active access records | Role assignments on the matching user |
 
 Only roles whose names start with `aMember:` are created, updated, or deleted by this plugin. All other roles and assignments are left untouched.

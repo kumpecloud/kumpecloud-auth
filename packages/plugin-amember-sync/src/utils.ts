@@ -18,6 +18,34 @@ export const resolveAMemberUserEmail = (user: AMemberUser): string | undefined =
   return;
 };
 
+export type AMemberUserIdentity = {
+  email?: string;
+  username?: string;
+};
+
+/**
+ * Resolve how an aMember user maps into Logto identifiers.
+ * Most aMember installs use a non-email `login` (username) with an optional separate email field.
+ */
+export const resolveAMemberUserIdentity = (user: AMemberUser): AMemberUserIdentity | undefined => {
+  const login = user.login.trim();
+
+  if (!login) {
+    return;
+  }
+
+  const email = resolveAMemberUserEmail(user);
+
+  if (email) {
+    return {
+      email,
+      username: email === login.toLowerCase() ? undefined : login,
+    };
+  }
+
+  return { username: login };
+};
+
 export const normalizeBcryptHash = (hash: string) => hash.replace(/^\$2y\$/u, '$2a$');
 
 export const truncateRoleDescription = (value: string, maxLength = 128) =>
@@ -118,9 +146,15 @@ export const isAMemberUserActive = (user: {
     return true;
   }
 
-  if (user.status === 1 || user.status === '1' || user.status === 'active') {
+  const normalized = String(user.status).trim().toLowerCase();
+
+  if (['0', '1', 'active', 'pending', 'approved'].includes(normalized)) {
     return true;
   }
 
-  return false;
+  if (['2', 'inactive', 'expired', 'disabled'].includes(normalized)) {
+    return false;
+  }
+
+  return true;
 };
