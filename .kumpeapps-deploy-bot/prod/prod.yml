@@ -12,7 +12,7 @@ domains:
   - auth-console.kumpe.app
 
 docker_compose: docker-compose.yml
-
+plan_name: small-ai
 env_mappings:
   NEBULA_CLIENT_TOKEN: PROD_NEBULA_CLIENT_TOKEN
   POSTGRES_PASSWORD: PROD_AUTH_POSTGRES_PASSWORD

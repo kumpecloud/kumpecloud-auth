@@ -12,7 +12,7 @@ domains:
   - auth-console.stage.kumpe.app
 
 docker_compose: docker-compose.yml
-
+plan_name: small-ai
 env_mappings:
   NEBULA_CLIENT_TOKEN: STAGE_NEBULA_CLIENT_TOKEN
   POSTGRES_PASSWORD: STAGE_AUTH_POSTGRES_PASSWORD
