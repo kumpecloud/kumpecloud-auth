@@ -210,8 +210,8 @@ const getTenantIdFromEndpointUri = (endpoint: URL) => {
 const getManagementApiResourceFromEndpointUri = (endpoint: URL) => {
   const tenantId = getTenantIdFromEndpointUri(endpoint);
 
-  // This resource domain is fixed to `logto.app` for all environments (prod, staging, and dev)
-  return `https://${tenantId}.logto.app/api`;
+  // Built-in Management API resource indicators use the KumpeCloud host suffix.
+  return `https://${tenantId}.kumpe.app/api`;
 };
 
 const isHiddenEntry = (entryName: string) => {

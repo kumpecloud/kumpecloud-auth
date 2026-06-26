@@ -28,13 +28,13 @@ describe('Management API', () => {
 
   describe('getBaseUrl', () => {
     it('should return correct base URL for given tenant ID', () => {
-      expect(getBaseUrl('test-tenant')).toBe('https://test-tenant.logto.app');
+      expect(getBaseUrl('test-tenant')).toBe('https://test-tenant.kumpe.app');
     });
   });
 
   describe('getManagementApiIndicator', () => {
     it('should return correct management API indicator for given tenant ID', () => {
-      expect(getManagementApiIndicator('test-tenant')).toBe('https://test-tenant.logto.app/api');
+      expect(getManagementApiIndicator('test-tenant')).toBe('https://test-tenant.kumpe.app/api');
     });
   });
 
@@ -65,15 +65,15 @@ describe('Management API', () => {
       expect(MockClientCredentials).toHaveBeenCalledWith({
         clientId: 'test-client-id',
         clientSecret: 'test-client-secret',
-        tokenEndpoint: 'https://test-tenant.logto.app/oidc/token',
+        tokenEndpoint: 'https://test-tenant.kumpe.app/oidc/token',
         tokenParams: {
-          resource: 'https://test-tenant.logto.app/api',
+          resource: 'https://test-tenant.kumpe.app/api',
           scope: allScope,
         },
       });
 
       expect(mockCreateClient).toHaveBeenCalledWith({
-        baseUrl: 'https://test-tenant.logto.app',
+        baseUrl: 'https://test-tenant.kumpe.app',
       });
 
       expect(result.apiClient).toBe(mockApiClient);
@@ -220,12 +220,12 @@ describe('Management API', () => {
       const getToken = vi.fn().mockResolvedValue('test-token');
 
       const result = createApiClient({
-        baseUrl: 'https://test.logto.app',
+        baseUrl: 'https://test.kumpe.app',
         getToken,
       });
 
       expect(mockCreateClient).toHaveBeenCalledWith({
-        baseUrl: 'https://test.logto.app',
+        baseUrl: 'https://test.kumpe.app',
       });
 
       expect(result).toBe(mockApiClient);
@@ -235,7 +235,7 @@ describe('Management API', () => {
       const getToken = vi.fn().mockResolvedValue('test-token');
 
       createApiClient({
-        baseUrl: 'https://test.logto.app',
+        baseUrl: 'https://test.kumpe.app',
         getToken,
       });
 
@@ -267,7 +267,7 @@ describe('Management API', () => {
       const getToken = vi.fn().mockResolvedValue('test-token');
 
       createApiClient({
-        baseUrl: 'https://test.logto.app',
+        baseUrl: 'https://test.kumpe.app',
         getToken,
       });
 

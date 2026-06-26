@@ -1,6 +1,13 @@
 import { generateStandardId } from '@logto/shared/universal';
 
 import {
+  managementApiAccessRoleDescription,
+  managementApiAccessRoleName,
+  managementApiHostSuffix,
+  managementApiProductName,
+  meApiProductName,
+} from '../constants/management-api.js';
+import {
   RoleType,
   type CreateResource,
   type CreateRole,
@@ -46,8 +53,8 @@ export const defaultManagementApi = Object.freeze({
      *
      * Admin Console requires the access token of this resource to be functional.
      */
-    indicator: `https://${defaultTenantId}.logto.app/api`,
-    name: 'Logto Management API',
+    indicator: `https://${defaultTenantId}.${managementApiHostSuffix}/api`,
+    name: managementApiProductName,
   },
   scopes: [
     {
@@ -69,21 +76,21 @@ export const defaultManagementApi = Object.freeze({
     /** @deprecated You should not rely on this constant. Change to something else. */
     id: 'admin-role',
     name: InternalRole.Admin,
-    description: `Internal admin role for Logto tenant ${defaultTenantId}.`,
+    description: `Internal admin role for KumpeCloud Auth tenant ${defaultTenantId}.`,
     type: RoleType.MachineToMachine,
   },
 }) satisfies AdminData;
 
 export function getManagementApiResourceIndicator<TenantId extends string>(
   tenantId: TenantId
-): `https://${TenantId}.logto.app/api`;
+): `https://${TenantId}.${typeof managementApiHostSuffix}/api`;
 export function getManagementApiResourceIndicator<TenantId extends string, Path extends string>(
   tenantId: TenantId,
   path: Path
-): `https://${TenantId}.logto.app/${Path}`;
+): `https://${TenantId}.${typeof managementApiHostSuffix}/${Path}`;
 
 export function getManagementApiResourceIndicator(tenantId: string, path = 'api') {
-  return `https://${tenantId}.logto.app/${path}`;
+  return `https://${tenantId}.${managementApiHostSuffix}/${path}`;
 }
 
 /**
@@ -101,7 +108,7 @@ export const createAdminData = (tenantId: string) => {
       tenantId,
       id: resourceId,
       indicator: getManagementApiResourceIndicator(tenantId),
-      name: `Logto Management API`,
+      name: managementApiProductName,
     },
     scopes: [
       {
@@ -117,7 +124,7 @@ export const createAdminData = (tenantId: string) => {
       tenantId,
       id: generateStandardId(),
       name: InternalRole.Admin,
-      description: `Internal admin role for Logto tenant ${defaultTenantId}.`,
+      description: `Internal admin role for KumpeCloud Auth tenant ${defaultTenantId}.`,
       type: RoleType.MachineToMachine,
     },
   } satisfies AdminData);
@@ -132,7 +139,7 @@ export const createAdminDataInAdminTenant = (tenantId: string) => {
       tenantId: adminTenantId,
       id: resourceId,
       indicator: getManagementApiResourceIndicator(tenantId),
-      name: `Logto Management API for tenant ${tenantId}`,
+      name: `${managementApiProductName} for tenant ${tenantId}`,
     },
     scopes: [
       {
@@ -156,7 +163,7 @@ export const createMeApiInAdminTenant = () => {
       tenantId: adminTenantId,
       id: resourceId,
       indicator: getManagementApiResourceIndicator(adminTenantId, 'me'),
-      name: `Logto Me API`,
+      name: meApiProductName,
     },
     scopes: [
       {
@@ -183,7 +190,7 @@ export const createMeApiInAdminTenant = () => {
 export const createPreConfiguredManagementApiAccessRole = (tenantId: string): CreateRole => ({
   tenantId,
   id: generateStandardId(),
-  description: 'This default role grants access to the Logto management API.',
-  name: 'Logto Management API access',
+  description: managementApiAccessRoleDescription,
+  name: managementApiAccessRoleName,
   type: RoleType.MachineToMachine,
 });
