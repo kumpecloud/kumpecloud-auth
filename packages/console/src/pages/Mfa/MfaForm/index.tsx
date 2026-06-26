@@ -19,6 +19,7 @@ import FormCard from '@/components/FormCard';
 import InlineUpsell from '@/components/InlineUpsell';
 import UnsavedChangesAlertModal from '@/components/UnsavedChangesAlertModal';
 import { mfa } from '@/consts';
+import { isCloud } from '@/consts/env';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
 import { TenantsContext } from '@/contexts/TenantsProvider';
 import DynamicT from '@/ds-components/DynamicT';
@@ -64,7 +65,8 @@ function MfaForm({ data, adaptiveMfa, signInMethods, onMfaUpdated }: Props) {
   const { currentTenantId } = useContext(TenantsContext);
   const { isConnectorTypeEnabled } = useEnabledConnectorTypes();
 
-  const isMfaDisabled = !currentSubscriptionQuota.mfaEnabled && !isPaidPlan(planId, isEnterprisePlan);
+  const isMfaDisabled =
+    isCloud && !currentSubscriptionQuota.mfaEnabled && !isPaidPlan(planId, isEnterprisePlan);
 
   const { t } = useTranslation(undefined, { keyPrefix: 'admin_console' });
   const {

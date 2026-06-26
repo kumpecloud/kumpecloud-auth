@@ -3,7 +3,12 @@ import { useContext, useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 
 import { useCloudApi } from '@/cloud/hooks/use-cloud-api';
-import { type LogtoSkuResponse, type SubscriptionUsageResponse } from '@/cloud/types/router';
+import {
+  type LogtoSkuResponse,
+  type SubscriptionCountBasedUsage,
+  type SubscriptionQuota,
+  type SubscriptionUsageResponse,
+} from '@/cloud/types/router';
 import {
   defaultLogtoSku,
   defaultTenantResponse,
@@ -18,6 +23,20 @@ import { formatLogtoSkusResponses } from '@/utils/subscription';
 import useSubscription from '../../hooks/use-subscription';
 
 import { type SubscriptionContext } from './types';
+
+const normalizeSubscriptionQuota = (
+  quota?: SubscriptionUsageResponse['quota']
+): SubscriptionQuota => ({
+  ...defaultSubscriptionQuota,
+  ...quota,
+});
+
+const normalizeSubscriptionUsage = (
+  usage?: SubscriptionUsageResponse['usage']
+): SubscriptionCountBasedUsage => ({
+  ...defaultSubscriptionUsage,
+  ...usage,
+});
 
 const useSubscriptionData: () => SubscriptionContext & { isLoading: boolean } = () => {
   const cloudApi = useCloudApi();
@@ -63,6 +82,27 @@ const useSubscriptionData: () => SubscriptionContext & { isLoading: boolean } = 
     [currentTenant?.planId, logtoSkus]
   );
 
+  const currentSubscriptionQuota = useMemo(
+    () =>
+      isCloud
+        ? normalizeSubscriptionQuota(subscriptionUsageData?.quota)
+        : normalizeSubscriptionQuota(currentSku.quota),
+    [currentSku.quota, subscriptionUsageData?.quota]
+  );
+
+  const currentSubscriptionBasicQuota = useMemo(
+    () =>
+      isCloud
+        ? normalizeSubscriptionQuota(subscriptionUsageData?.basicQuota)
+        : normalizeSubscriptionQuota(currentSku.quota),
+    [currentSku.quota, subscriptionUsageData?.basicQuota]
+  );
+
+  const currentSubscriptionUsage = useMemo(
+    () => normalizeSubscriptionUsage(subscriptionUsageData?.usage),
+    [subscriptionUsageData?.usage]
+  );
+
   useEffect(() => {
     if (subscriptionUsageData?.quota) {
       updateTenant(currentTenantId, {
@@ -79,26 +119,26 @@ const useSubscriptionData: () => SubscriptionContext & { isLoading: boolean } = 
       currentSubscription: currentSubscription ?? defaultTenantResponse.subscription,
       onCurrentSubscriptionUpdated: mutateSubscription,
       mutateSubscriptionQuotaAndUsages,
-      currentSubscriptionQuota: subscriptionUsageData?.quota ?? defaultSubscriptionQuota,
-      currentSubscriptionBasicQuota: subscriptionUsageData?.basicQuota ?? defaultSubscriptionQuota,
-      currentSubscriptionUsage: subscriptionUsageData?.usage ?? defaultSubscriptionUsage,
+      currentSubscriptionQuota,
+      currentSubscriptionBasicQuota,
+      currentSubscriptionUsage,
       currentSubscriptionResourceScopeUsage: subscriptionUsageData?.resources ?? {},
       currentSubscriptionRoleScopeUsage: subscriptionUsageData?.roles ?? {},
     }),
     [
       currentSku,
       currentSubscription,
+      currentSubscriptionBasicQuota,
+      currentSubscriptionQuota,
+      currentSubscriptionUsage,
       isLogtoSkusLoading,
       isSubscriptionLoading,
       isSubscriptionUsageDataLoading,
       logtoSkus,
       mutateSubscription,
       mutateSubscriptionQuotaAndUsages,
-      subscriptionUsageData?.quota,
-      subscriptionUsageData?.basicQuota,
       subscriptionUsageData?.resources,
       subscriptionUsageData?.roles,
-      subscriptionUsageData?.usage,
     ]
   );
 };

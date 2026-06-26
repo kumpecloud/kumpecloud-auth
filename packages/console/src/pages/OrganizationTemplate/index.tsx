@@ -8,6 +8,7 @@ import OrganizationEmpty from '@/assets/images/organization-empty.svg?react';
 import Drawer from '@/components/Drawer';
 import PageMeta from '@/components/PageMeta';
 import { OrganizationTemplateTabs, organizationTemplateLink } from '@/consts';
+import { isCloud } from '@/consts/env';
 import { subscriptionPage } from '@/consts/pages';
 import { latestProPlanId } from '@/consts/subscriptions';
 import { SubscriptionDataContext } from '@/contexts/SubscriptionDataProvider';
@@ -36,7 +37,7 @@ function OrganizationTemplate() {
   const isPaidTenant = isPaidPlan(planId, isEnterprisePlan);
 
   const isOrganizationsDisabled =
-    !isFeatureEnabled(currentSubscriptionQuota.organizationsLimit) && !isPaidTenant;
+    isCloud && !isFeatureEnabled(currentSubscriptionQuota.organizationsLimit) && !isPaidTenant;
 
   const { navigate } = useTenantPathname();
 
