@@ -5,7 +5,7 @@ import {
   isAMemberRoleName,
   parseAMemberProductIdFromRoleName,
 } from './constants.js';
-import { isAccessActive, isAMemberUserActive, resolveAMemberUserEmail } from './utils.js';
+import { isAccessActive, isAMemberUserActive, resolveAMemberUserEmail, resolveAMemberUserIdentity } from './utils.js';
 
 describe('aMember role naming', () => {
   it('builds and parses product role names', () => {
@@ -25,6 +25,22 @@ describe('aMember user helpers', () => {
       'user@example.com'
     );
     expect(resolveAMemberUserEmail({ userId: 1, login: 'username-only' })).toBeUndefined();
+  });
+
+  it('maps username-only logins into Logto usernames', () => {
+    expect(resolveAMemberUserIdentity({ userId: 1, login: 'username-only' })).toEqual({
+      username: 'username-only',
+    });
+    expect(
+      resolveAMemberUserIdentity({
+        userId: 1,
+        login: 'member',
+        email: 'member@example.com',
+      })
+    ).toEqual({
+      email: 'member@example.com',
+      username: 'member',
+    });
   });
 });
 
@@ -49,6 +65,7 @@ describe('aMember user activity', () => {
     expect(isAMemberUserActive({ userId: 1, login: 'a', isLocked: true })).toBe(false);
     expect(isAMemberUserActive({ userId: 1, login: 'a', isDeleted: true })).toBe(false);
     expect(isAMemberUserActive({ userId: 1, login: 'a', status: 2 })).toBe(false);
+    expect(isAMemberUserActive({ userId: 1, login: 'a', status: 0 })).toBe(true);
     expect(isAMemberUserActive({ userId: 1, login: 'a', status: 1 })).toBe(true);
   });
 });

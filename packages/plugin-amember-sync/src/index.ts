@@ -10,6 +10,7 @@ export {
   isAMemberUserActive,
   normalizeBcryptHash,
   resolveAMemberUserEmail,
+  resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from './utils.js';
 export type {

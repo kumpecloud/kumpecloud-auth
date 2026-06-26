@@ -1,13 +1,13 @@
 import { parseAMemberProductIdFromRoleName } from './constants.js';
-import type { AMemberSyncContext } from './context.js';
+import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
+import type { AMemberSyncConfig, AMemberSyncLogger, AMemberSyncStats, AMemberUser } from './types.js';
 import { createAMemberDataSource } from './sources/index.js';
-import type { AMemberSyncConfig, AMemberSyncLogger, AMemberSyncStats } from './types.js';
 import {
   getAMemberUserIdFromCustomData,
   groupActiveAccessByUserId,
   indexProductsById,
   isAMemberUserActive,
-  resolveAMemberUserEmail,
+  resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from './utils.js';
 
@@ -24,10 +24,11 @@ const emptyStats = (): AMemberSyncStats => ({
 });
 
 const findLogtoUserForAMemberUser = (
-  user: { userId: number; email?: string; login: string },
+  user: AMemberUser,
   indexes: {
-    byEmail: Map<string, { id: string }>;
-    byAMemberUserId: Map<number, { id: string }>;
+    byEmail: Map<string, LogtoUserRecord>;
+    byUsername: Map<string, LogtoUserRecord>;
+    byAMemberUserId: Map<number, LogtoUserRecord>;
   }
 ) => {
   const byId = indexes.byAMemberUserId.get(user.userId);
@@ -36,13 +37,23 @@ const findLogtoUserForAMemberUser = (
     return byId;
   }
 
-  const email = resolveAMemberUserEmail(user);
+  const identity = resolveAMemberUserIdentity(user);
 
-  if (!email) {
+  if (!identity) {
     return;
   }
 
-  return indexes.byEmail.get(email);
+  if (identity.email) {
+    const byEmail = indexes.byEmail.get(identity.email);
+
+    if (byEmail) {
+      return byEmail;
+    }
+  }
+
+  if (identity.username) {
+    return indexes.byUsername.get(identity.username.toLowerCase());
+  }
 };
 
 export const runAMemberSync = async ({
@@ -109,10 +120,10 @@ export const runAMemberSync = async ({
   const logtoUserIdByAMemberUserId = new Map<number, string>();
 
   for (const user of users) {
-    const email = resolveAMemberUserEmail(user);
+    const identity = resolveAMemberUserIdentity(user);
 
-    if (!email) {
-      logger.warn(`Skipping aMember user ${user.userId}: no usable email address`);
+    if (!identity || (!identity.email && !identity.username)) {
+      logger.warn(`Skipping aMember user ${user.userId}: no usable login, email, or username`);
       stats.usersSkipped += 1;
       continue;
     }
@@ -121,7 +132,15 @@ export const runAMemberSync = async ({
 
     if (!existing) {
       const created = await context.createUserFromAMember(user);
-      userIndexes.byEmail.set(email, created);
+
+      if (created.primaryEmail) {
+        userIndexes.byEmail.set(created.primaryEmail.toLowerCase(), created);
+      }
+
+      if (created.username) {
+        userIndexes.byUsername.set(created.username.toLowerCase(), created);
+      }
+
       userIndexes.byAMemberUserId.set(user.userId, created);
       logtoUserIdByAMemberUserId.set(user.userId, created.id);
       stats.usersCreated += 1;
@@ -183,7 +202,7 @@ export const runAMemberSync = async ({
   }
 
   logger.info(
-    `aMember sync complete: ${stats.productsCreated} roles created, ${stats.productsUpdated} updated, ${stats.productsDeleted} deleted, ${stats.usersCreated} users created, ${stats.usersUpdated} updated, ${stats.roleAssignmentsAdded} role assignments added, ${stats.roleAssignmentsRemoved} removed, ${stats.rolesRevokedDueToInactivity} revoked due to inactivity`
+    `aMember sync complete: ${stats.productsCreated} roles created, ${stats.productsUpdated} updated, ${stats.productsDeleted} deleted, ${stats.usersCreated} users created, ${stats.usersUpdated} updated, ${stats.usersSkipped} skipped, ${stats.roleAssignmentsAdded} role assignments added, ${stats.roleAssignmentsRemoved} removed, ${stats.rolesRevokedDueToInactivity} revoked due to inactivity`
   );
 
   return stats;
