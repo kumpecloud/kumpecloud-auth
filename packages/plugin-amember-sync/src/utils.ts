@@ -51,17 +51,69 @@ export const normalizeBcryptHash = (hash: string) => hash.replace(/^\$2y\$/u, '$
 export const truncateRoleDescription = (value: string, maxLength = 128) =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 
-export const isAccessActive = (access: AMemberAccess, now = new Date()) => {
-  const { expireDate } = access;
+export const normalizeAMemberDateString = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) {
+    return;
+  }
 
-  if (!expireDate || expireDate === '0000-00-00') {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value.toISOString().slice(0, 10);
+  }
+
+  const stringValue = String(value).trim();
+
+  if (!stringValue) {
+    return;
+  }
+
+  if (stringValue.startsWith('0000-00-00')) {
+    return '0000-00-00';
+  }
+
+  return /^(\d{4}-\d{2}-\d{2})/u.exec(stringValue)?.[1];
+};
+
+const parseAMemberDateStart = (value?: string) => {
+  const normalized = normalizeAMemberDateString(value);
+
+  if (!normalized || normalized === '0000-00-00') {
+    return;
+  }
+
+  const beginsAt = new Date(`${normalized}T00:00:00.000Z`);
+
+  return Number.isNaN(beginsAt.getTime()) ? undefined : beginsAt;
+};
+
+const parseAMemberDateEnd = (value?: string) => {
+  const normalized = normalizeAMemberDateString(value);
+
+  if (!normalized || normalized === '0000-00-00') {
+    return;
+  }
+
+  const expiresAt = new Date(`${normalized}T23:59:59.999Z`);
+
+  return Number.isNaN(expiresAt.getTime()) ? undefined : expiresAt;
+};
+
+export const isAccessActive = (access: AMemberAccess, now = new Date()) => {
+  const beginsAt = parseAMemberDateStart(access.beginDate);
+
+  if (beginsAt && beginsAt > now) {
+    return false;
+  }
+
+  const normalizedExpire = normalizeAMemberDateString(access.expireDate);
+
+  if (!normalizedExpire || normalizedExpire === '0000-00-00') {
     return true;
   }
 
-  const expiresAt = new Date(`${expireDate}T23:59:59.999Z`);
+  const expiresAt = parseAMemberDateEnd(normalizedExpire);
 
-  if (Number.isNaN(expiresAt.getTime())) {
-    return true;
+  if (!expiresAt) {
+    return false;
   }
 
   return expiresAt >= now;
