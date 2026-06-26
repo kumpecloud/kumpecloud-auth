@@ -16,6 +16,7 @@ import { RoleType, Roles, Users, UsersPasswordEncryptionMethod, type Role } from
 import { generateStandardId } from '@logto/shared';
 import { sql } from '@silverhand/slonik';
 
+import type { UserLibrary } from '#src/libraries/user.js';
 import { buildUserPasswordPayload } from '#src/libraries/user.utils.js';
 import type Queries from '#src/tenants/Queries.js';
 import { convertToIdentifiers } from '#src/utils/sql.js';
@@ -25,13 +26,15 @@ const { table: usersTable, fields: userFields } = convertToIdentifiers(Users);
 
 export const createAMemberSyncContext = (
   queries: Queries,
+  usersLibrary: Pick<UserLibrary, 'generateUserId' | 'insertUser'>,
   { syncPasswords }: { syncPasswords: boolean }
 ): AMemberSyncContext => {
   const {
     roles: { insertRole, updateRoleById, deleteRoleById, findRolesByRoleIds },
-    users: { generateUserId, insertUser, updateUserById },
+    users: { updateUserById },
     usersRoles: { findUsersRolesByUserId, insertUsersRoles, deleteUsersRolesByUserIdAndRoleId },
   } = queries;
+  const { generateUserId, insertUser } = usersLibrary;
 
   const findAMemberRoles = async () =>
     queries.pool.any<Role>(sql`

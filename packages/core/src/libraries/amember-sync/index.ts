@@ -42,7 +42,7 @@ export const runTenantAMemberSync = async (tenantId: string) => {
       return;
     }
 
-    const context = createAMemberSyncContext(tenant.queries, {
+    const context = createAMemberSyncContext(tenant.queries, tenant.libraries.users, {
       syncPasswords: config.syncPasswords,
     });
 
