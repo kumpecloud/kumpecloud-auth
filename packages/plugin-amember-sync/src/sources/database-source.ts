@@ -2,7 +2,7 @@ import mysql from 'mysql2/promise';
 
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
-import { isTruthyFlag } from '../utils.js';
+import { isTruthyFlag, normalizeAMemberDateString } from '../utils.js';
 
 type DatabaseRow = Record<string, unknown>;
 
@@ -114,8 +114,8 @@ export const createDatabaseAMemberDataSource = ({
             return {
               userId,
               productId,
-              beginDate: toString(row.begin_date),
-              expireDate: toString(row.expire_date),
+              beginDate: normalizeAMemberDateString(row.begin_date),
+              expireDate: normalizeAMemberDateString(row.expire_date),
             } satisfies AMemberAccess;
           })
           .filter((item): item is AMemberAccess => item !== undefined);

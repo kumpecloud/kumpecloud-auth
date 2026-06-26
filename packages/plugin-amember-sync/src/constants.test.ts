@@ -5,7 +5,7 @@ import {
   isAMemberRoleName,
   parseAMemberProductIdFromRoleName,
 } from './constants.js';
-import { isAccessActive, isAMemberUserActive, resolveAMemberUserEmail, resolveAMemberUserIdentity } from './utils.js';
+import { isAccessActive, isAMemberUserActive, normalizeAMemberDateString, resolveAMemberUserEmail, resolveAMemberUserIdentity } from './utils.js';
 
 describe('aMember role naming', () => {
   it('builds and parses product role names', () => {
@@ -54,6 +54,27 @@ describe('aMember access helpers', () => {
     expect(
       isAccessActive(
         { userId: 1, productId: 1, expireDate: '2000-01-01' },
+        new Date('2020-01-01T00:00:00.000Z')
+      )
+    ).toBe(false);
+  });
+
+  it('normalizes mysql date objects and datetime strings', () => {
+    expect(normalizeAMemberDateString(new Date('2020-01-15T00:00:00.000Z'))).toBe('2020-01-15');
+    expect(normalizeAMemberDateString('2020-01-15 00:00:00')).toBe('2020-01-15');
+
+    expect(
+      isAccessActive(
+        { userId: 1, productId: 1, expireDate: '2020-01-15 00:00:00' },
+        new Date('2020-01-16T00:00:00.000Z')
+      )
+    ).toBe(false);
+  });
+
+  it('treats future begin dates as inactive', () => {
+    expect(
+      isAccessActive(
+        { userId: 1, productId: 1, beginDate: '2099-01-01', expireDate: '2099-12-31' },
         new Date('2020-01-01T00:00:00.000Z')
       )
     ).toBe(false);

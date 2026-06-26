@@ -156,16 +156,15 @@ export const runAMemberSync = async ({
   }
 
   logger.info('Syncing aMember access to user role assignments...');
-  for (const [amemberUserId, productIds] of accessByUserId) {
-    const logtoUserId = logtoUserIdByAMemberUserId.get(amemberUserId);
-
-    if (!logtoUserId || !activeAMemberUserIds.has(amemberUserId)) {
+  for (const [amemberUserId, logtoUserId] of logtoUserIdByAMemberUserId) {
+    if (!activeAMemberUserIds.has(amemberUserId)) {
       continue;
     }
 
+    const productIds = [...(accessByUserId.get(amemberUserId) ?? [])];
     const { added, removed } = await context.syncUserAMemberRoles(
       logtoUserId,
-      [...productIds],
+      productIds,
       roleByProductId
     );
     stats.roleAssignmentsAdded += added;
