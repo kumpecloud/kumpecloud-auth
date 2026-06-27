@@ -2,7 +2,8 @@ import got from 'got';
 
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
-import { isTruthyFlag } from '../utils.js';
+import { parseAMemberUserProfileFields } from '../profile-fields.js';
+import { buildAMemberUserName, isTruthyFlag } from '../utils.js';
 
 type ApiListResponse<T> = {
   _total?: number;
@@ -23,8 +24,34 @@ type RawUser = {
   login?: string;
   email?: string;
   pass?: string;
+  crypt_pass?: string;
+  cryptPass?: string;
+  mobile_area_code?: string;
+  mobileAreaCode?: string;
+  mobile_number?: string;
+  mobileNumber?: string;
   name_f?: string;
   name_l?: string;
+  birthday?: string;
+  pushover_key?: string;
+  pushoverKey?: string;
+  subusers_parent_id?: number | string;
+  subusersParentId?: number | string;
+  pin?: string;
+  comment?: string;
+  i_agree?: number | string | boolean;
+  iAgree?: number | string | boolean;
+  is_aproved?: number | string | boolean;
+  is_approved?: number | string | boolean;
+  isApproved?: number | string | boolean;
+  street?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  lang?: string;
+  unsubscribed?: number | string | boolean;
   status?: number | string;
   is_locked?: number | string | boolean;
   isLocked?: number | string | boolean;
@@ -74,16 +101,19 @@ const mapUser = (raw: RawUser): AMemberUser | undefined => {
     return;
   }
 
-  const name = [raw.name_f, raw.name_l].filter(Boolean).join(' ').trim();
+  const name = buildAMemberUserName(raw.name_f, raw.name_l);
+  const profile = parseAMemberUserProfileFields(raw as Record<string, unknown>);
 
   return {
     userId,
     login,
     email: raw.email?.trim(),
     passwordHash: raw.pass?.trim(),
-    name: name || undefined,
-    status: raw.status,
-    isLocked: isTruthyFlag(raw.is_locked ?? raw.isLocked),
+    cryptPass: (raw.crypt_pass ?? raw.cryptPass)?.trim(),
+    mobileAreaCode: (raw.mobile_area_code ?? raw.mobileAreaCode)?.trim(),
+    mobileNumber: (raw.mobile_number ?? raw.mobileNumber)?.trim(),
+    name,
+    ...profile,
     isDeleted: isTruthyFlag(raw.deleted ?? raw.is_deleted),
   };
 };

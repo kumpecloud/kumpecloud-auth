@@ -12,11 +12,35 @@ export type AMemberUser = {
   userId: number;
   login: string;
   email?: string;
+  /** Legacy phpass/bcrypt value from `am_user.pass` (API sync only). */
   passwordHash?: string;
+  /** Unix crypt hash from `am_user.crypt_pass` (database sync). */
+  cryptPass?: string;
+  /** Value from `am_user.mobile_number`. */
+  mobileNumber?: string;
+  /** Country calling code from `am_user.mobile_area_code` (e.g. `1`, `61`). */
+  mobileAreaCode?: string;
   name?: string;
+  birthday?: string;
+  pushoverKey?: string;
+  subusersParentId?: number;
+  pin?: string;
+  comment?: string;
+  iAgree?: boolean;
+  isApproved?: boolean;
+  street?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  lang?: string;
+  unsubscribed?: boolean;
   status?: number | string;
   isLocked?: boolean;
   isDeleted?: boolean;
+  nameF?: string;
+  nameL?: string;
 };
 
 export type AMemberAccess = {

@@ -1,3 +1,20 @@
+import {
+  isBcryptHash,
+  isBcryptHashPrefix,
+  isCryptMd5Hash,
+  isPhpassHash,
+  normalizeBcryptHash,
+  PhoneNumberParser,
+} from '@logto/shared/universal';
+
+export {
+  isBcryptHash,
+  isBcryptHashPrefix,
+  isCryptMd5Hash,
+  isPhpassHash,
+  normalizeBcryptHash,
+} from '@logto/shared/universal';
+
 import type { AMemberAccess, AMemberProduct, AMemberUser } from './types.js';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -46,7 +63,192 @@ export const resolveAMemberUserIdentity = (user: AMemberUser): AMemberUserIdenti
   return { username: login };
 };
 
-export const normalizeBcryptHash = (hash: string) => hash.replace(/^\$2y\$/u, '$2a$');
+export type AMemberPasswordImport = {
+  passwordEncrypted: string;
+  passwordEncryptionMethod: 'Legacy' | 'Bcrypt' | 'MD5';
+};
+
+export const buildPhpassLegacyPassword = (hash: string) =>
+  JSON.stringify(['phpass', ['@'], hash]);
+
+export const buildCryptMd5LegacyPassword = (hash: string) =>
+  JSON.stringify(['crypt-md5', ['@'], hash]);
+
+const mapPassColumnHash = (passwordHash: string | undefined): AMemberPasswordImport | undefined => {
+  const hash = passwordHash?.trim();
+
+  if (!hash) {
+    return;
+  }
+
+  if (isBcryptHash(hash) || isBcryptHashPrefix(hash)) {
+    const normalized = normalizeBcryptHash(hash);
+
+    if (!isBcryptHash(normalized)) {
+      return;
+    }
+
+    return {
+      passwordEncrypted: normalized,
+      passwordEncryptionMethod: 'Bcrypt',
+    };
+  }
+
+  if (isPhpassHash(hash)) {
+    return {
+      passwordEncrypted: buildPhpassLegacyPassword(hash),
+      passwordEncryptionMethod: 'Legacy',
+    };
+  }
+
+  if (isCryptMd5Hash(hash)) {
+    return {
+      passwordEncrypted: buildCryptMd5LegacyPassword(hash),
+      passwordEncryptionMethod: 'Legacy',
+    };
+  }
+
+  if (/^[a-f0-9]{32}$/iu.test(hash)) {
+    return {
+      passwordEncrypted: hash.toLowerCase(),
+      passwordEncryptionMethod: 'MD5',
+    };
+  }
+
+  return;
+};
+
+/**
+ * Map aMember password fields into Logto password storage.
+ * Database sync reads `crypt_pass` only; API sync may still provide legacy `pass`.
+ */
+export const resolveAMemberPasswordImport = (
+  user: Pick<AMemberUser, 'passwordHash' | 'cryptPass'>
+): AMemberPasswordImport | undefined => {
+  const cryptPass = user.cryptPass?.trim();
+
+  if (cryptPass && isCryptMd5Hash(cryptPass)) {
+    return {
+      passwordEncrypted: buildCryptMd5LegacyPassword(cryptPass),
+      passwordEncryptionMethod: 'Legacy',
+    };
+  }
+
+  return mapPassColumnHash(user.passwordHash);
+};
+
+const sanitizePhoneDigits = (phone: string) => phone.replace(/\D/gu, '');
+
+const tryParsePrimaryPhone = (phone: string) => {
+  const parser = new PhoneNumberParser(phone);
+  const internationalNumber = parser.internationalNumber;
+
+  if (parser.isValid && internationalNumber && internationalNumber.length >= 8) {
+    return internationalNumber;
+  }
+
+  return;
+};
+
+const normalizePhoneInput = (phone: string) => {
+  const digits = sanitizePhoneDigits(phone);
+
+  if (digits.length === 10 && !phone.startsWith('+')) {
+    const nanp = tryParsePrimaryPhone(`+1${digits}`);
+
+    if (nanp) {
+      return nanp;
+    }
+  }
+
+  if (digits.length === 11 && digits.startsWith('1') && !phone.startsWith('+')) {
+    const nanp = tryParsePrimaryPhone(`+${digits}`);
+
+    if (nanp) {
+      return nanp;
+    }
+  }
+
+  const direct = tryParsePrimaryPhone(phone);
+
+  if (direct) {
+    return direct;
+  }
+
+  if (digits && !phone.startsWith('+')) {
+    return tryParsePrimaryPhone(`+${digits}`);
+  }
+
+  return;
+};
+
+/**
+ * Combine aMember `mobile_area_code` and `mobile_number` into a single phone string.
+ * When the number already includes a country prefix (`+` or full international digits), the area code is ignored.
+ */
+export const combineAMemberPhoneFields = (
+  mobileNumber?: string,
+  mobileAreaCode?: string
+): string | undefined => {
+  const number = mobileNumber?.trim();
+
+  if (!number) {
+    return;
+  }
+
+  if (number.startsWith('+')) {
+    return number;
+  }
+
+  const areaCode = mobileAreaCode?.trim();
+
+  if (areaCode) {
+    const areaDigits = sanitizePhoneDigits(areaCode);
+    const localDigits = sanitizePhoneDigits(number).replace(/^0+/, '');
+
+    if (!localDigits) {
+      return;
+    }
+
+    return `+${areaDigits}${localDigits}`;
+  }
+
+  return number;
+};
+
+/**
+ * Normalize aMember phone fields into Logto `primaryPhone` storage format.
+ * Accepts common input styles (formatted, digits-only, with/without `+`) and returns
+ * the international number string Logto uses (`countryCode` + `nationalNumber`).
+ */
+export const resolveAMemberPrimaryPhone = (
+  mobileNumber?: string,
+  mobileAreaCode?: string
+): string | undefined => {
+  const combined = combineAMemberPhoneFields(mobileNumber, mobileAreaCode);
+
+  if (!combined) {
+    return;
+  }
+
+  return normalizePhoneInput(combined);
+};
+
+export const buildAMemberPhoneUpdate = (
+  user: Pick<AMemberUser, 'mobileNumber' | 'mobileAreaCode'>
+) => {
+  if (user.mobileNumber === undefined && user.mobileAreaCode === undefined) {
+    return {};
+  }
+
+  if (!user.mobileNumber?.trim() && !user.mobileAreaCode?.trim()) {
+    return { primaryPhone: null };
+  }
+
+  return {
+    primaryPhone: resolveAMemberPrimaryPhone(user.mobileNumber, user.mobileAreaCode) ?? null,
+  };
+};
 
 export const truncateRoleDescription = (value: string, maxLength = 128) =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
@@ -153,24 +355,6 @@ export const getAMemberUserIdFromCustomData = (
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-export const buildAMemberCustomData = (
-  userId: number,
-  existing?: Record<string, unknown>
-) => {
-  const existingAMember =
-    existing?.amember && typeof existing.amember === 'object'
-      ? (existing.amember as Record<string, unknown>)
-      : {};
-
-  return {
-    ...existing,
-    amember: {
-      ...existingAMember,
-      userId,
-    },
-  };
-};
-
 export const isTruthyFlag = (value: unknown) => {
   if (value === true || value === 1) {
     return true;
@@ -183,6 +367,12 @@ export const isTruthyFlag = (value: unknown) => {
   }
 
   return false;
+};
+
+export const buildAMemberUserName = (nameF?: string, nameL?: string) => {
+  const name = [nameF, nameL].filter(Boolean).join(' ').trim();
+
+  return name || undefined;
 };
 
 export const isAMemberUserActive = (user: {

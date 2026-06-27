@@ -1,14 +1,26 @@
 export { amemberRolePrefix, buildAMemberRoleName, isAMemberRoleName } from './constants.js';
 export type { AMemberSyncContext, AMemberDataSource, LogtoUserRecord } from './context.js';
 export { loadAMemberSyncConfigFromEnv, resolveAMemberSyncConfig } from './config.js';
+export {
+  aMemberProfileFieldDescriptors,
+  buildAMemberCustomData,
+  buildAMemberSyncedCustomDataFields,
+  parseAMemberUserProfileFields,
+} from './profile-fields.js';
 export { createAMemberDataSource } from './sources/index.js';
 export { runAMemberSync } from './sync.js';
 export {
-  buildAMemberCustomData,
+  buildAMemberUserName,
   getAMemberUserIdFromCustomData,
   groupActiveAccessByUserId,
   isAMemberUserActive,
+  isBcryptHash,
+  isCryptMd5Hash,
+  isPhpassHash,
   normalizeBcryptHash,
+  resolveAMemberPasswordImport,
+  resolveAMemberPrimaryPhone,
+  combineAMemberPhoneFields,
   resolveAMemberUserEmail,
   resolveAMemberUserIdentity,
   truncateRoleDescription,
