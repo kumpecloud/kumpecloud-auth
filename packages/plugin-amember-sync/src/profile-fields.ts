@@ -1,5 +1,13 @@
+import type { SerializableValue } from '@silverhand/slonik';
+
 import type { AMemberUser } from './types.js';
 import { isTruthyFlag, normalizeAMemberDateString } from './utils.js';
+
+type SerializableJsonObject = {
+  [key: string]: SerializableValue | undefined;
+};
+
+export type AMemberCustomData = SerializableJsonObject;
 
 type AMemberProfileFieldKind = 'string' | 'boolean' | 'number' | 'date' | 'status';
 
@@ -211,7 +219,7 @@ export const parseAMemberUserProfileFields = (
   ) as AMemberSyncedProfileUser;
 
 const assignCustomDataValue = (
-  target: Record<string, unknown>,
+  target: SerializableJsonObject,
   descriptor: AMemberProfileFieldDescriptor,
   value: unknown
 ) => {
@@ -227,16 +235,31 @@ const assignCustomDataValue = (
     return;
   }
 
-  if (descriptor.kind === 'boolean' || descriptor.kind === 'number' || descriptor.kind === 'status') {
-    if (value !== null && value !== '') {
+  if (descriptor.kind === 'boolean' && typeof value === 'boolean') {
+    target[descriptor.customDataKey] = value;
+    return;
+  }
+
+  if (descriptor.kind === 'number' && typeof value === 'number') {
+    target[descriptor.customDataKey] = value;
+    return;
+  }
+
+  if (descriptor.kind === 'status') {
+    if (typeof value === 'number') {
+      target[descriptor.customDataKey] = value;
+      return;
+    }
+
+    if (typeof value === 'string' && value) {
       target[descriptor.customDataKey] = value;
     }
   }
 };
 
 /** Build the sync-managed `customData.amember` payload using aMember column names. */
-export const buildAMemberSyncedCustomDataFields = (user: AMemberUser): Record<string, unknown> => {
-  const amember: Record<string, unknown> = {
+export const buildAMemberSyncedCustomDataFields = (user: AMemberUser): SerializableJsonObject => {
+  const amember: SerializableJsonObject = {
     userId: user.userId,
   };
 
@@ -249,8 +272,8 @@ export const buildAMemberSyncedCustomDataFields = (user: AMemberUser): Record<st
 
 export const buildAMemberCustomData = (
   user: AMemberUser,
-  existing?: Record<string, unknown>
-) => ({
+  existing?: SerializableJsonObject
+): SerializableJsonObject => ({
   ...existing,
   amember: buildAMemberSyncedCustomDataFields(user),
 });
