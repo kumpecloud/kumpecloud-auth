@@ -1,9 +1,11 @@
+import { buildAMemberCustomData } from './profile-fields.js';
 import { buildAMemberRoleName, isAMemberRoleName } from './constants.js';
 import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
 import {
-  buildAMemberCustomData,
   getAMemberUserIdFromCustomData,
-  normalizeBcryptHash,
+  buildAMemberPhoneUpdate,
+  resolveAMemberPasswordImport,
+  resolveAMemberPrimaryPhone,
   resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from './utils.js';
@@ -142,13 +144,10 @@ export const createSlonikAMemberSyncContext = (
       }
 
       const userId = generateStandardShortId();
-      const passwordEncrypted =
-        syncPasswords && user.passwordHash
-          ? normalizeBcryptHash(user.passwordHash)
-          : null;
-      const passwordEncryptionMethod = passwordEncrypted
-        ? UsersPasswordEncryptionMethod.Bcrypt
-        : null;
+      const importedPassword = syncPasswords ? resolveAMemberPasswordImport(user) : undefined;
+      const passwordEncrypted = importedPassword?.passwordEncrypted ?? null;
+      const passwordEncryptionMethod = importedPassword?.passwordEncryptionMethod ?? null;
+      const primaryPhone = resolveAMemberPrimaryPhone(user.mobileNumber, user.mobileAreaCode) ?? null;
 
       await pool.query(sql`
         insert into ${usersTable} (
@@ -156,6 +155,7 @@ export const createSlonikAMemberSyncContext = (
           id,
           primary_email,
           username,
+          primary_phone,
           name,
           custom_data,
           password_encrypted,
@@ -167,8 +167,9 @@ export const createSlonikAMemberSyncContext = (
           ${userId},
           ${identity.email ?? null},
           ${identity.username ?? null},
+          ${primaryPhone},
           ${user.name ?? null},
-          ${sql.jsonb(buildAMemberCustomData(user.userId))},
+          ${sql.jsonb(buildAMemberCustomData(user))},
           ${passwordEncrypted},
           ${passwordEncryptionMethod},
           ${passwordEncrypted ? toTimestampFromMs(Date.now()) : null}
@@ -181,7 +182,7 @@ export const createSlonikAMemberSyncContext = (
         id: userId,
         primaryEmail: identity.email ?? null,
         username: identity.username ?? null,
-        customData: buildAMemberCustomData(user.userId),
+        customData: buildAMemberCustomData(user),
         passwordEncrypted,
         passwordEncryptionMethod,
       };
@@ -196,36 +197,45 @@ export const createSlonikAMemberSyncContext = (
       const existing = await pool.maybeOne<{
         customData: Record<string, unknown>;
         passwordEncrypted: string | null;
+        passwordEncryptionMethod: string | null;
       }>(sql`
-        select custom_data as "customData", password_encrypted as "passwordEncrypted"
+        select
+          custom_data as "customData",
+          password_encrypted as "passwordEncrypted",
+          password_encryption_method as "passwordEncryptionMethod"
         from ${usersTable}
         where tenant_id = ${tenantId}
           and id = ${userId}
       `);
 
-      const nextPassword =
-        syncPasswords && user.passwordHash ? normalizeBcryptHash(user.passwordHash) : null;
+      const importedPassword = syncPasswords ? resolveAMemberPasswordImport(user) : undefined;
       const shouldUpdatePassword = Boolean(
-        nextPassword && nextPassword !== existing?.passwordEncrypted
+        importedPassword &&
+          (importedPassword.passwordEncrypted !== existing?.passwordEncrypted ||
+            importedPassword.passwordEncryptionMethod !== existing?.passwordEncryptionMethod)
       );
+
+      const phoneUpdate = buildAMemberPhoneUpdate(user);
 
       await pool.query(sql`
         update ${usersTable}
         set
           primary_email = ${identity.email ?? null},
           username = ${identity.username ?? null},
+          primary_phone = case
+            when ${phoneUpdate.primaryPhone !== undefined} then ${phoneUpdate.primaryPhone ?? null}
+            else primary_phone
+          end,
           name = ${user.name ?? null},
-          custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb({
-            amember: {
-              userId: user.userId,
-            },
-          })},
+          custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb(
+            buildAMemberCustomData(user, existing?.customData ?? {})
+          )},
           password_encrypted = case
-            when ${shouldUpdatePassword} then ${nextPassword}
+            when ${shouldUpdatePassword} then ${importedPassword?.passwordEncrypted ?? null}
             else password_encrypted
           end,
           password_encryption_method = case
-            when ${shouldUpdatePassword} then ${UsersPasswordEncryptionMethod.Bcrypt}
+            when ${shouldUpdatePassword} then ${importedPassword?.passwordEncryptionMethod ?? null}
             else password_encryption_method
           end,
           password_updated_at = case

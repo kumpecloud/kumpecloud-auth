@@ -2,6 +2,8 @@ import { UsersPasswordEncryptionMethod } from '@logto/schemas';
 import { argon2Verify, bcryptVerify, md5, sha1, sha256 } from 'hash-wasm';
 
 import RequestError from '#src/errors/RequestError/index.js';
+import { checkCryptMd5Password, isCryptMd5Hash } from '#src/utils/crypt-md5.js';
+import { checkPhpassPassword, isBcryptHash, isPhpassHash } from '#src/utils/phpass.js';
 import { legacyVerify } from '#src/utils/password.js';
 
 /**
@@ -72,7 +74,19 @@ export const isPasswordValid = async ({
       return (await sha256(password)) === passwordEncrypted;
     }
     case UsersPasswordEncryptionMethod.Bcrypt: {
-      return bcryptVerify({ password, hash: passwordEncrypted });
+      if (isBcryptHash(passwordEncrypted)) {
+        return bcryptVerify({ password, hash: passwordEncrypted });
+      }
+
+      if (isPhpassHash(passwordEncrypted)) {
+        return checkPhpassPassword(password, passwordEncrypted);
+      }
+
+      if (isCryptMd5Hash(passwordEncrypted)) {
+        return checkCryptMd5Password(password, passwordEncrypted);
+      }
+
+      return false;
     }
     case UsersPasswordEncryptionMethod.Legacy: {
       return legacyVerify(passwordEncrypted, password);

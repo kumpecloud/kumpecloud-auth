@@ -8,11 +8,13 @@ import {
 import {
   buildAMemberCustomData,
   getAMemberUserIdFromCustomData,
-  normalizeBcryptHash,
+  buildAMemberPhoneUpdate,
+  resolveAMemberPasswordImport,
+  resolveAMemberPrimaryPhone,
   resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from '@logto/plugin-amember-sync';
-import { RoleType, Roles, Users, UsersPasswordEncryptionMethod, type Role } from '@logto/schemas';
+import { RoleType, Roles, Users, type Role } from '@logto/schemas';
 import { generateStandardId } from '@logto/shared';
 import { sql } from '@silverhand/slonik';
 
@@ -82,20 +84,24 @@ export const createAMemberSyncContext = (
   };
 
   const buildPasswordPayload = (user: AMemberUser, existing?: LogtoUserRecord) => {
-    if (!syncPasswords || !user.passwordHash) {
+    if (!syncPasswords) {
       return {};
     }
 
-    const passwordEncrypted = normalizeBcryptHash(user.passwordHash);
+    const imported = resolveAMemberPasswordImport(user);
 
-    if (existing?.passwordEncrypted === passwordEncrypted) {
+    if (!imported) {
       return {};
     }
 
-    return buildUserPasswordPayload({
-      passwordEncrypted,
-      passwordEncryptionMethod: UsersPasswordEncryptionMethod.Bcrypt,
-    });
+    if (
+      existing?.passwordEncrypted === imported.passwordEncrypted &&
+      existing?.passwordEncryptionMethod === imported.passwordEncryptionMethod
+    ) {
+      return {};
+    }
+
+    return buildUserPasswordPayload(imported);
   };
 
   return {
@@ -121,12 +127,15 @@ export const createAMemberSyncContext = (
         throw new Error(`Cannot create user without login for aMember user ${user.userId}`);
       }
 
+      const primaryPhone = resolveAMemberPrimaryPhone(user.mobileNumber, user.mobileAreaCode);
+
       const [created] = await insertUser({
         id: await generateUserId(),
         primaryEmail: identity.email,
         username: identity.username,
         name: user.name,
-        customData: buildAMemberCustomData(user.userId),
+        ...(primaryPhone && { primaryPhone }),
+        customData: buildAMemberCustomData(user),
         ...buildPasswordPayload(user),
       });
 
@@ -154,8 +163,9 @@ export const createAMemberSyncContext = (
         primaryEmail: identity.email,
         username: identity.username,
         name: user.name,
+        ...buildAMemberPhoneUpdate(user),
         customData: buildAMemberCustomData(
-          user.userId,
+          user,
           (existing?.customData ?? {}) as Record<string, unknown>
         ),
         ...passwordPayload,

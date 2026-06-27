@@ -2,7 +2,8 @@ import mysql from 'mysql2/promise';
 
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
-import { isTruthyFlag, normalizeAMemberDateString } from '../utils.js';
+import { parseAMemberUserProfileFields } from '../profile-fields.js';
+import { buildAMemberUserName, normalizeAMemberDateString } from '../utils.js';
 
 type DatabaseRow = Record<string, unknown>;
 
@@ -65,7 +66,33 @@ export const createDatabaseAMemberDataSource = ({
 
       try {
         const [rows] = await connection.query<DatabaseRow[]>(
-          `select user_id, login, email, pass, name_f, name_l, status, is_locked from ${userTable}`
+          `select
+            user_id,
+            login,
+            email,
+            crypt_pass,
+            mobile_area_code,
+            mobile_number,
+            birthday,
+            pushover_key,
+            subusers_parent_id,
+            pin,
+            comment,
+            i_agree,
+            is_aproved,
+            is_locked,
+            unsubscribed,
+            status,
+            name_f,
+            name_l,
+            street,
+            street2,
+            city,
+            state,
+            zip,
+            country,
+            lang
+          from ${userTable}`
         );
 
         return rows
@@ -77,16 +104,17 @@ export const createDatabaseAMemberDataSource = ({
               return;
             }
 
-            const name = [toString(row.name_f), toString(row.name_l)].filter(Boolean).join(' ').trim();
+            const profile = parseAMemberUserProfileFields(row);
 
             return {
               userId,
               login,
               email: toString(row.email)?.trim(),
-              passwordHash: toString(row.pass)?.trim(),
-              name: name || undefined,
-              status: toNumber(row.status) ?? toString(row.status),
-              isLocked: isTruthyFlag(row.is_locked),
+              cryptPass: toString(row.crypt_pass)?.trim(),
+              mobileAreaCode: toString(row.mobile_area_code)?.trim(),
+              mobileNumber: toString(row.mobile_number)?.trim(),
+              name: buildAMemberUserName(profile.nameF, profile.nameL),
+              ...profile,
             } satisfies AMemberUser;
           })
           .filter((item): item is AMemberUser => item !== undefined);

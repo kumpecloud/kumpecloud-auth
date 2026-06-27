@@ -7,6 +7,8 @@ import { z } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
 import assertThat from '#src/utils/assert-that.js';
+import { checkCryptMd5Password } from '#src/utils/crypt-md5.js';
+import { checkPhpassPassword } from '#src/utils/phpass.js';
 
 import passwordEncryptionWorker from '../workers/password-encryption-worker.js';
 
@@ -29,7 +31,12 @@ function isFirebaseScryptAlgorithm(algorithm: string): boolean {
 }
 
 function isLegacyHashAlgorithm(algorithm: string): boolean {
-  if (isPbkdf2Algorithm(algorithm) || isFirebaseScryptAlgorithm(algorithm)) {
+  if (
+    isPbkdf2Algorithm(algorithm) ||
+    isFirebaseScryptAlgorithm(algorithm) ||
+    algorithm === 'phpass' ||
+    algorithm === 'crypt-md5'
+  ) {
     return true;
   }
 
@@ -162,6 +169,15 @@ export const legacyVerify = async (
 ): Promise<boolean> => {
   try {
     const parsed = parseLegacyPassword(storedPassword);
+
+    if (parsed.algorithm === 'phpass') {
+      return checkPhpassPassword(inputPassword, parsed.encryptedPassword);
+    }
+
+    if (parsed.algorithm === 'crypt-md5') {
+      return checkCryptMd5Password(inputPassword, parsed.encryptedPassword);
+    }
+
     const calculatedHash = await executeLegacyHash(parsed, inputPassword);
     return calculatedHash === parsed.encryptedPassword;
   } catch {
