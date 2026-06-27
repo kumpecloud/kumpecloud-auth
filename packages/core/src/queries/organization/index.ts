@@ -37,6 +37,10 @@ import { EmailDomainQueries, type JitOrganization } from './email-domains.js';
 import { SsoConnectorQueries } from './sso-connectors.js';
 import { UserRelationQueries } from './user-relations.js';
 import { UserRoleRelationQueries } from './user-role-relations.js';
+import {
+  normalizeOrganizationRole,
+  normalizeOrganizationRoleWithScopes,
+} from './role-utils.js';
 
 /**
  * The schema field keys that can be used for searching roles.
@@ -49,7 +53,8 @@ class OrganizationRolesQueries extends SchemaQueries<
   OrganizationRole
 > {
   override async findById(id: string): Promise<Readonly<OrganizationRoleWithScopes>> {
-    return this.pool.one(this.#findWithScopesSql(id));
+    const role = await this.pool.one(this.#findWithScopesSql(id));
+    return normalizeOrganizationRoleWithScopes(role);
   }
 
   override async findAll(
@@ -57,20 +62,79 @@ class OrganizationRolesQueries extends SchemaQueries<
     offset: number,
     search?: SearchOptions<OrganizationRoleKeys>
   ): Promise<[totalNumber: number, rows: Readonly<OrganizationRoleWithScopes[]>]> {
-    return Promise.all([
+    const [count, roles] = await Promise.all([
       this.findTotalNumber(search),
       this.pool.any(this.#findWithScopesSql(undefined, limit, offset, search)),
     ]);
+
+    return [count, roles.map((role) => normalizeOrganizationRoleWithScopes(role))];
+  }
+
+  override async updateById(
+    id: string,
+    data: Partial<OrganizationRole>,
+    jsonbMode: 'replace' | 'merge' = 'replace'
+  ): Promise<Readonly<OrganizationRole>> {
+    const role = await super.updateById(id, data, jsonbMode);
+    return normalizeOrganizationRole(role);
+  }
+
+  async createRoleWithScopes(
+    data: CreateOrganizationRole,
+    organizationScopeIds: readonly string[],
+    resourceScopeIds: readonly string[]
+  ): Promise<Readonly<OrganizationRole>> {
+    return this.pool.transaction(async (transaction) => {
+      const roles = new OrganizationRolesQueries(transaction, OrganizationRoles, {
+        field: 'name',
+        order: 'asc',
+      });
+      const rolesScopes = new TwoRelationsQueries(
+        transaction,
+        OrganizationRoleScopeRelations.table,
+        OrganizationRoles,
+        OrganizationScopes
+      );
+      const rolesResourceScopes = new TwoRelationsQueries(
+        transaction,
+        OrganizationRoleResourceScopeRelations.table,
+        OrganizationRoles,
+        Scopes
+      );
+      const role = await roles.insert(data);
+
+      if (organizationScopeIds.length > 0) {
+        await rolesScopes.insert(
+          ...organizationScopeIds.map((id) => ({
+            organizationRoleId: role.id,
+            organizationScopeId: id,
+          }))
+        );
+      }
+
+      if (resourceScopeIds.length > 0) {
+        await rolesResourceScopes.insert(
+          ...resourceScopeIds.map((id) => ({
+            organizationRoleId: role.id,
+            scopeId: id,
+          }))
+        );
+      }
+
+      return normalizeOrganizationRole(role);
+    });
   }
 
   async findAllByNames(names: string[]): Promise<Readonly<OrganizationRole[]>> {
     const { table, fields } = convertToIdentifiers(OrganizationRoles);
 
-    return this.pool.any<OrganizationRole>(sql`
+    const roles = await this.pool.any<OrganizationRole>(sql`
       select ${table}.*
       from ${table}
       where ${fields.name} = any(${sql.array(names, 'text')})  
     `);
+
+    return roles.map((role) => normalizeOrganizationRole(role));
   }
 
   #findWithScopesSql(

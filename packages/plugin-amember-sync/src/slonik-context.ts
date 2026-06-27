@@ -1,4 +1,4 @@
-import { buildAMemberCustomData } from './profile-fields.js';
+import { buildAMemberCustomData, type AMemberCustomData } from './profile-fields.js';
 import { buildAMemberRoleName, isAMemberRoleName } from './constants.js';
 import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
 import {
@@ -228,7 +228,7 @@ export const createSlonikAMemberSyncContext = (
           end,
           name = ${user.name ?? null},
           custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb(
-            buildAMemberCustomData(user, existing?.customData ?? {})
+            buildAMemberCustomData(user, (existing?.customData ?? {}) as AMemberCustomData)
           )},
           password_encrypted = case
             when ${shouldUpdatePassword} then ${importedPassword?.passwordEncrypted ?? null}
