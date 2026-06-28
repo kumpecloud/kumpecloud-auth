@@ -37,6 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      nebula_client:
+        condition: service_started
     ports:
       # Caddy reverse-proxies to the VM/Nebula IP on these ports.
       - '3001:3001'
@@ -54,7 +56,7 @@ services:
     entrypoint:
       - sh
       - -c
-      - npm run cli db seed -- --swe --dapc && npm run cli db alteration deploy && exec npm start
+      - npm run cli db seed -- --swe --dapc && npm run cli db alteration deploy latest && npm run cli db alteration deploy next && exec npm start
     healthcheck:
       test:
         [

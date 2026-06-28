@@ -10,6 +10,7 @@ export {
 export { createAMemberDataSource } from './sources/index.js';
 export { runAMemberSync } from './sync.js';
 export {
+  buildAMemberPhoneUpdate,
   buildAMemberUserName,
   getAMemberUserIdFromCustomData,
   groupActiveAccessByUserId,

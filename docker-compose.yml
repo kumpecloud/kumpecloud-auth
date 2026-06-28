@@ -5,7 +5,7 @@ services:
       postgres:
         condition: service_healthy
     image: ghcr.io/kumpecloud/kumpecloud-auth:${TAG-latest}
-    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm run cli db alteration deploy && npm start"]
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm run cli db alteration deploy latest && npm run cli db alteration deploy next && npm start"]
     ports:
       - 3001:3001
       - 3002:3002
