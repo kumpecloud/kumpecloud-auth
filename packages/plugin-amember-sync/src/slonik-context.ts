@@ -227,6 +227,7 @@ export const createSlonikAMemberSyncContext = (
 
       const phoneUpdate = buildAMemberPhoneUpdate(user);
       const suspensionUpdate = buildAMemberSuspensionUpdate(user);
+      const shouldUpdateSuspension = suspensionUpdate.isSuspended !== undefined;
 
       await pool.query(sql`
         update ${usersTable}
@@ -240,7 +241,7 @@ export const createSlonikAMemberSyncContext = (
           name = ${user.name ?? null},
           profile = ${sql.jsonb(buildAMemberUserProfile(user, existing?.profile))},
           is_suspended = case
-            when ${suspensionUpdate.isSuspended !== undefined} then ${suspensionUpdate.isSuspended}
+            when ${shouldUpdateSuspension} then ${suspensionUpdate.isSuspended ?? false}
             else is_suspended
           end,
           custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb(
