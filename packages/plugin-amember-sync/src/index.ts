@@ -5,12 +5,14 @@ export {
   aMemberProfileFieldDescriptors,
   buildAMemberCustomData,
   buildAMemberSyncedCustomDataFields,
+  buildAMemberUserProfile,
   parseAMemberUserProfileFields,
 } from './profile-fields.js';
 export { createAMemberDataSource } from './sources/index.js';
 export { runAMemberSync } from './sync.js';
 export {
   buildAMemberPhoneUpdate,
+  buildAMemberSuspensionUpdate,
   buildAMemberUserName,
   getAMemberUserIdFromCustomData,
   groupActiveAccessByUserId,

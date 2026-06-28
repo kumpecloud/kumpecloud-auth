@@ -5,8 +5,9 @@ import {
   isAMemberRoleName,
   parseAMemberProductIdFromRoleName,
 } from './constants.js';
-import { buildAMemberCustomData } from './profile-fields.js';
+import { buildAMemberCustomData, buildAMemberUserProfile } from './profile-fields.js';
 import {
+  buildAMemberSuspensionUpdate,
   isAccessActive,
   isAMemberUserActive,
   normalizeAMemberDateString,
@@ -162,6 +163,67 @@ describe('aMember custom data import', () => {
   });
 });
 
+describe('aMember user profile import', () => {
+  it('maps name, birthday, locale, and address fields into UserProfile', () => {
+    expect(
+      buildAMemberUserProfile({
+        userId: 42,
+        login: 'member',
+        nameF: 'Jane',
+        nameL: 'Doe',
+        birthday: '1990-05-01',
+        street: '123 Main St',
+        street2: 'Apt 4',
+        city: 'Portland',
+        state: 'OR',
+        zip: '97201',
+        country: 'US',
+        lang: 'en',
+      })
+    ).toEqual({
+      givenName: 'Jane',
+      familyName: 'Doe',
+      birthdate: '1990-05-01',
+      locale: 'en',
+      address: {
+        streetAddress: '123 Main St, Apt 4',
+        locality: 'Portland',
+        region: 'OR',
+        postalCode: '97201',
+        country: 'US',
+        formatted: '123 Main St, Apt 4, Portland, OR, 97201, US',
+      },
+    });
+  });
+
+  it('preserves unrelated existing profile fields on update', () => {
+    expect(
+      buildAMemberUserProfile(
+        {
+          userId: 42,
+          login: 'member',
+          nameF: 'Jane',
+          city: 'Portland',
+        },
+        {
+          gender: 'female',
+          address: {
+            region: 'CA',
+          },
+        }
+      )
+    ).toEqual({
+      gender: 'female',
+      givenName: 'Jane',
+      address: {
+        region: 'CA',
+        locality: 'Portland',
+        formatted: 'Portland, CA',
+      },
+    });
+  });
+});
+
 describe('aMember phone import', () => {
   it('normalizes common phone formats to Logto storage format', () => {
     expect(resolveAMemberPrimaryPhone('+1 (650) 253-0000')).toBe('16502530000');
@@ -219,11 +281,26 @@ describe('aMember password import', () => {
 });
 
 describe('aMember user activity', () => {
-  it('detects locked, deleted, or inactive status', () => {
-    expect(isAMemberUserActive({ userId: 1, login: 'a', isLocked: true })).toBe(false);
+  it('detects deleted or inactive status', () => {
     expect(isAMemberUserActive({ userId: 1, login: 'a', isDeleted: true })).toBe(false);
     expect(isAMemberUserActive({ userId: 1, login: 'a', status: 2 })).toBe(false);
     expect(isAMemberUserActive({ userId: 1, login: 'a', status: 0 })).toBe(true);
     expect(isAMemberUserActive({ userId: 1, login: 'a', status: 1 })).toBe(true);
+  });
+
+  it('treats locked users as active for role assignment sync', () => {
+    expect(isAMemberUserActive({ userId: 1, login: 'a', isLocked: true })).toBe(true);
+  });
+});
+
+describe('aMember suspension import', () => {
+  it('maps is_locked to isSuspended when known', () => {
+    expect(buildAMemberSuspensionUpdate({ userId: 1, login: 'a', isLocked: true })).toEqual({
+      isSuspended: true,
+    });
+    expect(buildAMemberSuspensionUpdate({ userId: 1, login: 'a', isLocked: false })).toEqual({
+      isSuspended: false,
+    });
+    expect(buildAMemberSuspensionUpdate({ userId: 1, login: 'a' })).toEqual({});
   });
 });
