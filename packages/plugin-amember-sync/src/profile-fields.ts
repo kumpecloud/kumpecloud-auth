@@ -57,8 +57,8 @@ export const aMemberProfileFieldDescriptors = [
   },
   {
     userKey: 'isApproved',
-    customDataKey: 'is_aproved',
-    rawKeys: ['is_aproved', 'is_approved', 'isApproved', 'isAproved'],
+    customDataKey: 'is_approved',
+    rawKeys: ['is_approved', 'is_aproved', 'isApproved', 'isAproved'],
     kind: 'boolean',
   },
   {
@@ -134,6 +134,36 @@ export const aMemberProfileFieldDescriptors = [
     kind: 'string',
   },
 ] as const satisfies readonly AMemberProfileFieldDescriptor[];
+
+export const amemberUserBaseColumns = [
+  'user_id',
+  'login',
+  'email',
+  'crypt_pass',
+  'mobile_area_code',
+  'mobile_number',
+] as const;
+
+/** Pick user-table columns that exist in the connected aMember database. */
+export const resolveDatabaseUserSelectColumns = (availableColumns: ReadonlySet<string>) => {
+  const missingBase = amemberUserBaseColumns.filter((column) => !availableColumns.has(column));
+
+  if (missingBase.length > 0) {
+    throw new Error(`Missing required aMember user columns: ${missingBase.join(', ')}`);
+  }
+
+  const columns: string[] = [...amemberUserBaseColumns];
+
+  for (const descriptor of aMemberProfileFieldDescriptors) {
+    const column = descriptor.rawKeys.find((key) => availableColumns.has(key));
+
+    if (column) {
+      columns.push(column);
+    }
+  }
+
+  return columns;
+};
 
 export type AMemberSyncedProfileUser = Pick<
   AMemberUser,

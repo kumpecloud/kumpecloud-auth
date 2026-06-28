@@ -37,8 +37,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      nebula_client:
-        condition: service_started
     ports:
       # Caddy reverse-proxies to the VM/Nebula IP on these ports.
       - '3001:3001'
