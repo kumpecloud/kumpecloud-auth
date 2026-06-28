@@ -41,6 +41,7 @@ import {
 import type Libraries from '#src/tenants/Libraries.js';
 import type Queries from '#src/tenants/Queries.js';
 import { i18next } from '#src/utils/i18n.js';
+import { getGravatarEnabled } from '#src/utils/gravatar-settings.js';
 
 import { type SubscriptionLibrary } from '../libraries/subscription.js';
 import koaTokenUsageGuard from '../middleware/koa-token-usage-guard.js';
@@ -381,6 +382,10 @@ export default function initOidc(
             enabledExtendedIdTokenClaims: idTokenConfig?.enabledExtendedClaims,
           });
 
+          const gravatarEnabled = acceptedClaims.includes('picture')
+            ? await getGravatarEnabled(queries.accountCenters)
+            : false;
+
           return snakecaseKeys(
             {
               /**
@@ -390,7 +395,13 @@ export default function initOidc(
                */
               sub,
               ...Object.fromEntries(
-                await getUserClaimsData(user, acceptedClaims, libraries.users, organizations)
+                await getUserClaimsData(
+                  user,
+                  acceptedClaims,
+                  libraries.users,
+                  organizations,
+                  gravatarEnabled
+                )
               ),
             },
             {

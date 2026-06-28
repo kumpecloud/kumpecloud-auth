@@ -84,7 +84,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
           yes(includeSsoIdentities) && [...(await findUserSsoIdentities(userId))]
         ),
         includePasswordHash: yes(includePasswordHash),
-      });
+      }, { gravatarEnabled: ctx.gravatarEnabled });
 
       return next();
     }
@@ -297,7 +297,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         ...conditional(profile && { profile }),
       });
 
-      ctx.body = transpileAdminUserProfileResponse(user);
+      ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
       return next();
     }
   );
@@ -328,7 +328,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
       await checkIdentifierCollision(body, userId);
 
       const updatedUser = await updateUserById(userId, body, 'replace');
-      ctx.body = transpileAdminUserProfileResponse(updatedUser);
+      ctx.body = transpileAdminUserProfileResponse(updatedUser, {}, { gravatarEnabled: ctx.gravatarEnabled });
 
       return next();
     }
@@ -355,7 +355,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         await buildUserPasswordPayloadFromPassword(password)
       );
 
-      ctx.body = transpileAdminUserProfileResponse(user);
+      ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
 
       return next();
     }
@@ -390,7 +390,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
 
       const user = await updateUserById(userId, { isPasswordExpired: isExpired });
 
-      ctx.body = transpileAdminUserProfileResponse(user);
+      ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
 
       return next();
     }
@@ -461,7 +461,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         await signOutUser(user.id);
       }
 
-      ctx.body = transpileAdminUserProfileResponse(user);
+      ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
 
       return next();
     }

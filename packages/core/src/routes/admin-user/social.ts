@@ -152,7 +152,9 @@ export default function adminUserSocialRoutes<T extends ManagementApiRouter>(
       }
 
       const updatedUser = await deleteUserIdentity(userId, target);
-      ctx.body = transpileUserProfileResponse(updatedUser);
+      ctx.body = transpileUserProfileResponse(updatedUser, undefined, {
+        gravatarEnabled: ctx.gravatarEnabled,
+      });
 
       return next();
     }

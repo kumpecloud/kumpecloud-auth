@@ -5,6 +5,7 @@ import {
   userWithOrganizationRolesGuard,
   Users,
 } from '@logto/schemas';
+import { resolveUserAvatar } from '@logto/shared/universal';
 import { z } from 'zod';
 
 import { buildManagementApiContext, truncateMembershipDelta } from '#src/libraries/hook/utils.js';
@@ -49,7 +50,10 @@ export default function userRoutes(
       );
 
       ctx.pagination.totalCount = totalCount;
-      ctx.body = entities;
+      ctx.body = entities.map((user) => ({
+        ...user,
+        avatar: resolveUserAvatar(user, ctx.gravatarEnabled),
+      }));
 
       return next();
     }

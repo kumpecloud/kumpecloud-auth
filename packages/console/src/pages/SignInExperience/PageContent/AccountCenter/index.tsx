@@ -60,7 +60,7 @@ function AccountCenter({ isActive, data }: Props) {
     [t]
   );
 
-  const { enabled, fields } = watch('accountCenter');
+  const { enabled, gravatarEnabled, fields } = watch('accountCenter');
   const isAccountApiEnabled = enabled;
 
   const isMfaEnabled = useMemo(() => {
@@ -70,6 +70,13 @@ function AccountCenter({ isActive, data }: Props) {
   // When passkey sign-in is enabled, passkey can serve as a verification method, so the
   // "no MFA factor configured" warning on the MFA field is no longer relevant.
   const isPasskeySignInEnabled = isDevFeaturesEnabled && Boolean(data.passkeySignIn.enabled);
+
+  const handleGravatarToggle = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setValue('accountCenter.gravatarEnabled', event.target.checked, { shouldDirty: true });
+    },
+    [setValue]
+  );
 
   const handleToggle = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -178,6 +185,19 @@ function AccountCenter({ isActive, data }: Props) {
                     )}
                   </Trans>
                 </InlineNotification>
+              </FormField>
+            )}
+            {section.key === 'userProfile' && isDevFeaturesEnabled && (
+              <FormField
+                title="sign_in_exp.account_center.gravatar.title"
+                headlineSpacing="large"
+              >
+                <Switch
+                  checked={gravatarEnabled}
+                  disabled={isSubmitting}
+                  description="sign_in_exp.account_center.gravatar.description"
+                  onChange={handleGravatarToggle}
+                />
               </FormField>
             )}
             {section.groups.map((group) => (

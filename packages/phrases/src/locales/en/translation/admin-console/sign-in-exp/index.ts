@@ -118,6 +118,11 @@ const sign_in_exp = {
     enable_account_api: 'Enable account center and Account API',
     enable_account_api_description:
       "Turn on both the user-facing Account API and Logto's out-of-the-box account center. When off, both features are unavailable.",
+    gravatar: {
+      title: 'Gravatar avatars',
+      description:
+        "Use each user's Gravatar image based on their primary email when they have not uploaded a custom avatar.",
+    },
     field_options: {
       off: 'Off',
       edit: 'Edit',

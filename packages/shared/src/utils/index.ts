@@ -9,3 +9,4 @@ export * from './ttl-cache.js';
 export * from './user-display-name.js';
 export * from './mask.js';
 export * from './password-hash.js';
+export * from './gravatar.js';

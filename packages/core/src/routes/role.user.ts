@@ -61,7 +61,9 @@ export default function roleUserRoutes<T extends ManagementApiRouter>(
           ]);
 
           ctx.pagination.totalCount = count;
-          ctx.body = users.map((user) => transpileUserProfileResponse(user));
+          ctx.body = users.map((user) =>
+            transpileUserProfileResponse(user, undefined, { gravatarEnabled: ctx.gravatarEnabled })
+          );
 
           return next();
         },

@@ -21,7 +21,8 @@ export const getScopedProfile = async (
   queries: Queries,
   libraries: Libraries,
   scopes: Set<string>,
-  userId: string
+  userId: string,
+  gravatarEnabled = false
 ): Promise<{ profile: Partial<UserProfileResponse>; user: User }> => {
   const user = await queries.users.findUserById(userId);
 
@@ -45,7 +46,7 @@ export const getScopedProfile = async (
     applicationId,
     isSuspended,
     hasPassword,
-  } = transpileUserProfileResponse(user);
+  } = transpileUserProfileResponse(user, undefined, { gravatarEnabled });
 
   return {
     user,

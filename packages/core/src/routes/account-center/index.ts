@@ -36,6 +36,7 @@ export default function accountCentersRoutes<T extends ManagementApiRouter>(
     koaGuard({
       body: z.object({
         enabled: z.boolean().optional(),
+        gravatarEnabled: z.boolean().optional(),
         fields: accountCenterFieldControlGuard.optional(),
         webauthnRelatedOrigins: webauthnRelatedOriginsGuard.optional(),
         deleteAccountUrl: deleteAccountUrlGuard.nullable().optional(),
@@ -49,6 +50,7 @@ export default function accountCentersRoutes<T extends ManagementApiRouter>(
     async (ctx, next) => {
       const {
         enabled,
+        gravatarEnabled,
         fields,
         webauthnRelatedOrigins,
         deleteAccountUrl,
@@ -62,6 +64,7 @@ export default function accountCentersRoutes<T extends ManagementApiRouter>(
       await findDefaultAccountCenter();
       const updatedAccountCenter = await updateDefaultAccountCenter({
         enabled,
+        gravatarEnabled,
         fields,
         webauthnRelatedOrigins: webauthnRelatedOrigins
           ? deduplicate(webauthnRelatedOrigins)
