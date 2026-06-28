@@ -56,6 +56,7 @@ export type AccountCenterFieldKey = (typeof accountCenterFieldKeys)[number];
 
 export type AccountCenterFormValues = {
   enabled: boolean;
+  gravatarEnabled: boolean;
   fields: Record<AccountCenterFieldKey, AccountCenterControlValue>;
   webauthnRelatedOrigins: string[];
   deleteAccountUrl: string;
@@ -69,6 +70,7 @@ export type AccountCenterFormValues = {
 
 const createDefaultAccountCenterFormValues = (): AccountCenterFormValues => ({
   enabled: false,
+  gravatarEnabled: false,
   // eslint-disable-next-line no-restricted-syntax
   fields: Object.fromEntries(
     accountCenterFieldKeys.map((key) => [key, AccountCenterControlValue.Off])
@@ -87,6 +89,7 @@ export const convertAccountCenterToForm = (
   accountCenter?: AccountCenterConfig
 ): AccountCenterFormValues => ({
   enabled: accountCenter?.enabled ?? false,
+  gravatarEnabled: accountCenter?.gravatarEnabled ?? false,
   fields: {
     ...createDefaultAccountCenterFormValues().fields,
     ...accountCenter?.fields,

@@ -11,6 +11,7 @@ import {
 } from '@logto/schemas';
 import { PhoneNumberParser } from '@logto/shared/universal';
 import { pick } from '@silverhand/essentials';
+import { resolveUserAvatar } from '@logto/shared/universal';
 import { type z } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
@@ -57,6 +58,10 @@ export const transpileUserMfaVerifications = (
   });
 };
 
+type TranspileUserProfileOptions = {
+  gravatarEnabled?: boolean;
+};
+
 /**
  * Transforms user data into a `UserProfileResponse`. Password hash fields are intentionally
  * excluded.
@@ -66,9 +71,11 @@ export const transpileUserMfaVerifications = (
  */
 export const transpileUserProfileResponse = (
   user: User,
-  ssoIdentities?: UserSsoIdentity[]
+  ssoIdentities?: UserSsoIdentity[],
+  options?: TranspileUserProfileOptions
 ): UserProfileResponse => ({
   ...pick(user, ...userInfoSelectFields),
+  avatar: resolveUserAvatar(user, options?.gravatarEnabled ?? false),
   hasPassword: Boolean(user.passwordEncrypted),
   ...(ssoIdentities && { ssoIdentities }),
 });
@@ -86,12 +93,13 @@ export const transpileUserProfileResponse = (
  */
 export const transpileAdminUserProfileResponse = (
   user: User,
-  extraInfo: { ssoIdentities?: UserSsoIdentity[]; includePasswordHash?: boolean } = {}
+  extraInfo: { ssoIdentities?: UserSsoIdentity[]; includePasswordHash?: boolean } = {},
+  options?: TranspileUserProfileOptions
 ): AdminUserProfileResponse => {
   const { ssoIdentities, includePasswordHash } = extraInfo;
 
   return {
-    ...transpileUserProfileResponse(user, ssoIdentities),
+    ...transpileUserProfileResponse(user, ssoIdentities, options),
     ...(includePasswordHash && {
       passwordDigest: user.passwordEncrypted,
       passwordAlgorithm: user.passwordEncryptionMethod,

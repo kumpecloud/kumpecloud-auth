@@ -13,6 +13,7 @@ import koaAuth from '../middleware/koa-auth/index.js';
 import koaOidcAuth from '../middleware/koa-auth/koa-oidc-auth.js';
 import koaCors from '../middleware/koa-cors.js';
 import koaEmailI18n from '../middleware/koa-email-i18n.js';
+import koaGravatarSettings from '../middleware/koa-gravatar-settings.js';
 
 import { accountApiPrefix } from './account/constants.js';
 import accountRoutes from './account/index.js';
@@ -76,6 +77,7 @@ const createRouters = (tenant: TenantContext) => {
   const managementRouter: ManagementApiRouter = new Router();
   managementRouter.use(koaAuth(tenant.envSet, getManagementApiResourceIndicator(tenant.id)));
   managementRouter.use(koaTenantGuard(tenant.id, tenant.queries));
+  managementRouter.use(koaGravatarSettings(tenant.queries));
   managementRouter.use(koaManagementApiHooks(tenant.libraries.hooks));
 
   // TODO: FIXME @sijie @darcy mount these routes in `applicationRoutes` instead

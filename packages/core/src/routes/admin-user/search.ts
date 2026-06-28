@@ -84,7 +84,9 @@ export default function adminUserSearchRoutes<T extends ManagementApiRouter>(
 
           ctx.pagination.totalCount = count;
           ctx.body = users.map((user) =>
-            transpileAdminUserProfileResponse(user, { includePasswordHash })
+            transpileAdminUserProfileResponse(user, { includePasswordHash }, {
+              gravatarEnabled: ctx.gravatarEnabled,
+            })
           );
 
           return next();

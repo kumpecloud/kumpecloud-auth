@@ -13,5 +13,7 @@ create table account_centers (
   custom_css text,
   /** Ordered list of custom profile fields to show in the prebuilt account center */
   profile_fields jsonb /* @use AccountCenterProfileFields */,
+  /** When enabled, users without a custom avatar use their Gravatar image based on primary email */
+  gravatar_enabled boolean not null default false,
   primary key (tenant_id, id)
 );

@@ -8,6 +8,7 @@ import {
   UserScope,
 } from '@logto/core-kit';
 import { userProfileKeys, type User, type UserProfile } from '@logto/schemas';
+import { resolveUserAvatar } from '@logto/shared/universal';
 import { cond, pick } from '@silverhand/essentials';
 import { snakeCase } from 'snake-case';
 import { type SnakeCaseKeys } from 'snakecase-keys';
@@ -85,7 +86,8 @@ export const getUserClaimsData = async (
   user: User,
   claims: UserClaim[],
   userLibrary: Libraries['users'],
-  organizationQueries: Queries['organizations']
+  organizationQueries: Queries['organizations'],
+  gravatarEnabled = false
 ): Promise<ReadonlyArray<[UserClaim, unknown]>> => {
   const organizations = cond(
     claims.some((claim) => claim.startsWith('organization')) &&
@@ -136,6 +138,9 @@ export const getUserClaimsData = async (
         }
         case 'preferred_username': {
           return [claim, getPreferredUsername(user)];
+        }
+        case 'picture': {
+          return [claim, resolveUserAvatar(user, gravatarEnabled)];
         }
         default: {
           if (isUserProfileClaim(claim)) {

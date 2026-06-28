@@ -114,6 +114,7 @@ function PageContent({ data, onSignInExperienceUpdated, onAccountCenterUpdated }
         .patch('api/account-center', {
           json: {
             enabled: accountCenter.enabled,
+            gravatarEnabled: accountCenter.gravatarEnabled,
             // Disable all fields when account center is disabled
             fields: accountCenter.enabled ? accountCenter.fields : {},
             webauthnRelatedOrigins,

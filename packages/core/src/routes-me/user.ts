@@ -1,5 +1,6 @@
 import { emailRegEx, PasswordPolicyChecker, usernameRegEx } from '@logto/core-kit';
 import { userInfoSelectFields, jsonObjectGuard } from '@logto/schemas';
+import { resolveUserAvatar } from '@logto/shared/universal';
 import { condArray, conditional, pick } from '@silverhand/essentials';
 import { literal, object, string } from 'zod';
 
@@ -35,6 +36,7 @@ export default function userRoutes<T extends AuthedMeRouter>(
 
     const responseData = {
       ...pick(user, ...userInfoSelectFields),
+      avatar: resolveUserAvatar(user, ctx.gravatarEnabled),
       ...conditional(user.passwordEncrypted && { hasPassword: Boolean(user.passwordEncrypted) }),
     };
 
