@@ -1,9 +1,10 @@
-import { buildAMemberCustomData, type AMemberCustomData } from './profile-fields.js';
+import { buildAMemberCustomData, buildAMemberUserProfile, type AMemberCustomData } from './profile-fields.js';
 import { buildAMemberRoleName, isAMemberRoleName } from './constants.js';
 import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
 import {
   getAMemberUserIdFromCustomData,
   buildAMemberPhoneUpdate,
+  buildAMemberSuspensionUpdate,
   resolveAMemberPasswordImport,
   resolveAMemberPrimaryPhone,
   resolveAMemberUserIdentity,
@@ -148,6 +149,7 @@ export const createSlonikAMemberSyncContext = (
       const passwordEncrypted = importedPassword?.passwordEncrypted ?? null;
       const passwordEncryptionMethod = importedPassword?.passwordEncryptionMethod ?? null;
       const primaryPhone = resolveAMemberPrimaryPhone(user.mobileNumber, user.mobileAreaCode) ?? null;
+      const suspensionUpdate = buildAMemberSuspensionUpdate(user);
 
       await pool.query(sql`
         insert into ${usersTable} (
@@ -157,7 +159,9 @@ export const createSlonikAMemberSyncContext = (
           username,
           primary_phone,
           name,
+          profile,
           custom_data,
+          is_suspended,
           password_encrypted,
           password_encryption_method,
           password_updated_at
@@ -169,7 +173,9 @@ export const createSlonikAMemberSyncContext = (
           ${identity.username ?? null},
           ${primaryPhone},
           ${user.name ?? null},
+          ${sql.jsonb(buildAMemberUserProfile(user))},
           ${sql.jsonb(buildAMemberCustomData(user))},
+          ${suspensionUpdate.isSuspended ?? false},
           ${passwordEncrypted},
           ${passwordEncryptionMethod},
           ${passwordEncrypted ? toTimestampFromMs(Date.now()) : null}
@@ -196,11 +202,15 @@ export const createSlonikAMemberSyncContext = (
 
       const existing = await pool.maybeOne<{
         customData: Record<string, unknown>;
+        profile: Record<string, unknown>;
+        isSuspended: boolean;
         passwordEncrypted: string | null;
         passwordEncryptionMethod: string | null;
       }>(sql`
         select
           custom_data as "customData",
+          profile,
+          is_suspended as "isSuspended",
           password_encrypted as "passwordEncrypted",
           password_encryption_method as "passwordEncryptionMethod"
         from ${usersTable}
@@ -216,6 +226,7 @@ export const createSlonikAMemberSyncContext = (
       );
 
       const phoneUpdate = buildAMemberPhoneUpdate(user);
+      const suspensionUpdate = buildAMemberSuspensionUpdate(user);
 
       await pool.query(sql`
         update ${usersTable}
@@ -227,6 +238,11 @@ export const createSlonikAMemberSyncContext = (
             else primary_phone
           end,
           name = ${user.name ?? null},
+          profile = ${sql.jsonb(buildAMemberUserProfile(user, existing?.profile))},
+          is_suspended = case
+            when ${suspensionUpdate.isSuspended !== undefined} then ${suspensionUpdate.isSuspended}
+            else is_suspended
+          end,
           custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb(
             buildAMemberCustomData(user, (existing?.customData ?? {}) as AMemberCustomData)
           )},

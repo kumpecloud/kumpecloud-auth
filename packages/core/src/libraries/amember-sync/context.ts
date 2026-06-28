@@ -7,8 +7,10 @@ import {
 } from '@logto/plugin-amember-sync';
 import {
   buildAMemberCustomData,
+  buildAMemberUserProfile,
   getAMemberUserIdFromCustomData,
   buildAMemberPhoneUpdate,
+  buildAMemberSuspensionUpdate,
   resolveAMemberPasswordImport,
   resolveAMemberPrimaryPhone,
   resolveAMemberUserIdentity,
@@ -28,7 +30,7 @@ const { table: usersTable, fields: userFields } = convertToIdentifiers(Users);
 
 export const createAMemberSyncContext = (
   queries: Queries,
-  usersLibrary: Pick<UserLibrary, 'generateUserId' | 'insertUser'>,
+  usersLibrary: Pick<UserLibrary, 'generateUserId' | 'insertUser' | 'signOutUser'>,
   { syncPasswords }: { syncPasswords: boolean }
 ): AMemberSyncContext => {
   const {
@@ -36,7 +38,7 @@ export const createAMemberSyncContext = (
     users: { updateUserById },
     usersRoles: { findUsersRolesByUserId, insertUsersRoles, deleteUsersRolesByUserIdAndRoleId },
   } = queries;
-  const { generateUserId, insertUser } = usersLibrary;
+  const { generateUserId, insertUser, signOutUser } = usersLibrary;
 
   const findAMemberRoles = async () =>
     queries.pool.any<Role>(sql`
@@ -134,8 +136,10 @@ export const createAMemberSyncContext = (
         primaryEmail: identity.email,
         username: identity.username,
         name: user.name,
+        profile: buildAMemberUserProfile(user),
         ...(primaryPhone && { primaryPhone }),
         customData: buildAMemberCustomData(user),
+        ...buildAMemberSuspensionUpdate(user),
         ...buildPasswordPayload(user),
       });
 
@@ -158,18 +162,25 @@ export const createAMemberSyncContext = (
       const existingUsers = await queries.users.findUsersByIds([userId]);
       const existing = existingUsers[0];
       const passwordPayload = buildPasswordPayload(user, existing);
+      const suspensionUpdate = buildAMemberSuspensionUpdate(user);
 
       await updateUserById(userId, {
         primaryEmail: identity.email,
         username: identity.username,
         name: user.name,
+        profile: buildAMemberUserProfile(user, existing?.profile),
         ...buildAMemberPhoneUpdate(user),
         customData: buildAMemberCustomData(
           user,
           (existing?.customData ?? {}) as Record<string, unknown>
         ),
+        ...suspensionUpdate,
         ...passwordPayload,
       });
+
+      if (suspensionUpdate.isSuspended && !existing?.isSuspended) {
+        await signOutUser(userId);
+      }
     },
     syncUserAMemberRoles: async (userId, productIds, roleByProductId) => {
       const desiredRoleIds = new Set(

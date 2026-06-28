@@ -1,3 +1,4 @@
+import type { UserProfile } from '@logto/schemas';
 import type { SerializableValue } from '@silverhand/slonik';
 
 import type { AMemberUser } from './types.js';
@@ -307,3 +308,98 @@ export const buildAMemberCustomData = (
   ...existing,
   amember: buildAMemberSyncedCustomDataFields(user),
 });
+
+const buildStreetAddress = (street?: string, street2?: string) => {
+  const parts = [street, street2].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(', ') : undefined;
+};
+
+const buildFormattedAddress = (address: NonNullable<UserProfile['address']>) => {
+  const { streetAddress, locality, region, postalCode, country } = address;
+  const cityLine = [locality, region, postalCode].filter(Boolean).join(', ');
+  const parts = [streetAddress, cityLine, country].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(', ') : undefined;
+};
+
+/** Map aMember profile columns into Logto standard `UserProfile` fields. */
+const buildAMemberSyncedUserProfile = (user: AMemberUser): UserProfile => {
+  const streetAddress = buildStreetAddress(user.street, user.street2);
+  const address: NonNullable<UserProfile['address']> = {};
+
+  const profile: UserProfile = {};
+
+  if (streetAddress) {
+    address.streetAddress = streetAddress;
+  }
+
+  if (user.city) {
+    address.locality = user.city;
+  }
+
+  if (user.state) {
+    address.region = user.state;
+  }
+
+  if (user.zip) {
+    address.postalCode = user.zip;
+  }
+
+  if (user.country) {
+    address.country = user.country;
+  }
+
+  if (Object.keys(address).length > 0) {
+    address.formatted = buildFormattedAddress(address);
+    profile.address = address;
+  }
+
+  if (user.nameF) {
+    profile.givenName = user.nameF;
+  }
+
+  if (user.nameL) {
+    profile.familyName = user.nameL;
+  }
+
+  if (user.birthday) {
+    profile.birthdate = user.birthday;
+  }
+
+  if (user.lang) {
+    profile.locale = user.lang;
+  }
+
+  return profile;
+};
+
+/** Build the sync-managed `profile` payload, preserving unrelated existing profile fields. */
+export const buildAMemberUserProfile = (
+  user: AMemberUser,
+  existing?: UserProfile
+): UserProfile => {
+  const synced = buildAMemberSyncedUserProfile(user);
+
+  if (!existing) {
+    return synced;
+  }
+
+  const mergedAddress =
+    synced.address || existing.address
+      ? {
+          ...existing.address,
+          ...synced.address,
+        }
+      : undefined;
+
+  if (mergedAddress && Object.keys(mergedAddress).length > 0) {
+    mergedAddress.formatted = buildFormattedAddress(mergedAddress);
+  }
+
+  return {
+    ...existing,
+    ...synced,
+    ...(mergedAddress && { address: mergedAddress }),
+  };
+};

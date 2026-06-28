@@ -375,12 +375,22 @@ export const buildAMemberUserName = (nameF?: string, nameL?: string) => {
   return name || undefined;
 };
 
+/** Map aMember `is_locked` to Logto `isSuspended` when the lock state is known. */
+export const buildAMemberSuspensionUpdate = (
+  user: AMemberUser
+): { isSuspended?: boolean } => {
+  if (user.isLocked === undefined) {
+    return {};
+  }
+
+  return { isSuspended: user.isLocked };
+};
+
 export const isAMemberUserActive = (user: {
   status?: number | string;
-  isLocked?: boolean;
   isDeleted?: boolean;
 }) => {
-  if (user.isDeleted || user.isLocked) {
+  if (user.isDeleted) {
     return false;
   }
 

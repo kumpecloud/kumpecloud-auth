@@ -7,18 +7,22 @@ Sync aMember products, users, and access records into Kumpecloud Auth (Logto for
 | aMember | Kumpecloud Auth |
 |---------|-----------------|
 | Products | User roles named `aMember: {product_id}` with description set to the product title |
-| Users (email/login + bcrypt password hash) | Users matched by email or username (`login`), with profile fields stored under `customData.amember` |
+| Users (email/login + bcrypt password hash) | Users matched by email or username (`login`), with profile fields stored under `customData.amember` and mapped standard `profile` fields |
 | `mobile_area_code` + `mobile_number` | `primaryPhone` (normalized international format) |
-| Profile columns (see below) | `customData.amember.*` (aMember column names preserved) |
+| Profile columns (see below) | `customData.amember.*` (aMember column names preserved) and standard `profile` fields where applicable |
 
 Profile columns synced into `customData.amember`: `birthday`, `pushover_key`, `subusers_parent_id`, `pin`, `comment`, `i_agree`, `is_approved`, `is_locked`, `unsubscribed`, `status`, `name_f`, `name_l`, `street`, `street2`, `city`, `state`, `zip`, `country`, `lang`, plus `userId` for linkage.
+
+Standard `profile` mappings: `name_f` → `givenName`, `name_l` → `familyName`, `birthday` → `birthdate`, `lang` → `locale`, and address fields (`street`/`street2` → `address.streetAddress`, `city` → `address.locality`, `state` → `address.region`, `zip` → `address.postalCode`, `country` → `address.country`, plus `address.formatted`).
 | Active access records | Role assignments on the matching user |
 
 Only roles whose names start with `aMember:` are created, updated, or deleted by this plugin. All other roles and assignments are left untouched.
 
-Inactive, locked, deleted, or removed aMember users have all `aMember:` role assignments revoked. When they become active again, roles are restored from current aMember access on the next sync.
+Inactive, deleted, or removed aMember users have all `aMember:` role assignments revoked. When they become active again, roles are restored from current aMember access on the next sync.
 
-User passkeys, social identities, MFA/`logtoConfig`, and other profile fields are never modified by sync.
+`is_locked` from aMember is synced to Logto `isSuspended`, which blocks sign-in and revokes active sessions. Locked users keep their role assignments so access is restored automatically when the account is unlocked.
+
+User passkeys, social identities, MFA/`logtoConfig`, and other non-synced profile fields are never modified by sync.
 
 ## Configuration
 
