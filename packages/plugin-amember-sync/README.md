@@ -11,7 +11,7 @@ Sync aMember products, users, and access records into Kumpecloud Auth (Logto for
 | `mobile_area_code` + `mobile_number` | `primaryPhone` (normalized international format) |
 | Profile columns (see below) | `customData.amember.*` (aMember column names preserved) |
 
-Profile columns synced into `customData.amember`: `birthday`, `pushover_key`, `subusers_parent_id`, `pin`, `comment`, `i_agree`, `is_aproved`, `is_locked`, `unsubscribed`, `status`, `name_f`, `name_l`, `street`, `street2`, `city`, `state`, `zip`, `country`, `lang`, plus `userId` for linkage.
+Profile columns synced into `customData.amember`: `birthday`, `pushover_key`, `subusers_parent_id`, `pin`, `comment`, `i_agree`, `is_approved`, `is_locked`, `unsubscribed`, `status`, `name_f`, `name_l`, `street`, `street2`, `city`, `state`, `zip`, `country`, `lang`, plus `userId` for linkage.
 | Active access records | Role assignments on the matching user |
 
 Only roles whose names start with `aMember:` are created, updated, or deleted by this plugin. All other roles and assignments are left untouched.

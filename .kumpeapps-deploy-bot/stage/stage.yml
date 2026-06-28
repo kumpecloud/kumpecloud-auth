@@ -13,6 +13,9 @@ domains:
 
 docker_compose: docker-compose.yml
 plan_name: small-ai
+# Deploy bot skips nebula_client during compose up (--no-deps) to avoid disrupting VPN;
+# start it after app services are up (same compose file, injected at deploy time).
+post_deploy_hook: 'DOCKER_CONFIG="$(pwd)/.docker" docker compose up -d --no-deps nebula_client'
 env_mappings:
   NEBULA_CLIENT_TOKEN: STAGE_NEBULA_CLIENT_TOKEN
   POSTGRES_PASSWORD: STAGE_AUTH_POSTGRES_PASSWORD

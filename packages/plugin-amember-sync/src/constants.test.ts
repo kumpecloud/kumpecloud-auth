@@ -125,7 +125,7 @@ describe('aMember custom data import', () => {
         pin: '1234',
         comment: 'VIP member',
         i_agree: true,
-        is_aproved: false,
+        is_approved: false,
         is_locked: false,
         unsubscribed: true,
         status: 1,

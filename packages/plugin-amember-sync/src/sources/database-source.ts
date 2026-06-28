@@ -2,7 +2,7 @@ import mysql from 'mysql2/promise';
 
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
-import { parseAMemberUserProfileFields } from '../profile-fields.js';
+import { parseAMemberUserProfileFields, resolveDatabaseUserSelectColumns } from '../profile-fields.js';
 import { buildAMemberUserName, normalizeAMemberDateString } from '../utils.js';
 
 type DatabaseRow = Record<string, unknown>;
@@ -29,6 +29,20 @@ export const createDatabaseAMemberDataSource = ({
   const accessTable = `${prefix}access`;
 
   const getConnection = async () => mysql.createConnection(databaseUrl);
+
+  let cachedUserSelectColumns: string[] | undefined;
+
+  const getUserSelectColumns = async (connection: mysql.Connection) => {
+    if (cachedUserSelectColumns) {
+      return cachedUserSelectColumns;
+    }
+
+    const [columnRows] = await connection.query<DatabaseRow[]>(`show columns from ${userTable}`);
+    const availableColumns = new Set(columnRows.map((row) => String(row.Field)));
+    cachedUserSelectColumns = resolveDatabaseUserSelectColumns(availableColumns);
+
+    return cachedUserSelectColumns;
+  };
 
   return {
     getProducts: async () => {
@@ -65,34 +79,9 @@ export const createDatabaseAMemberDataSource = ({
       const connection = await getConnection();
 
       try {
+        const columns = await getUserSelectColumns(connection);
         const [rows] = await connection.query<DatabaseRow[]>(
-          `select
-            user_id,
-            login,
-            email,
-            crypt_pass,
-            mobile_area_code,
-            mobile_number,
-            birthday,
-            pushover_key,
-            subusers_parent_id,
-            pin,
-            comment,
-            i_agree,
-            is_aproved,
-            is_locked,
-            unsubscribed,
-            status,
-            name_f,
-            name_l,
-            street,
-            street2,
-            city,
-            state,
-            zip,
-            country,
-            lang
-          from ${userTable}`
+          `select ${columns.join(', ')} from ${userTable}`
         );
 
         return rows
