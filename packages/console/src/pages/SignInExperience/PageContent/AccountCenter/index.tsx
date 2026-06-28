@@ -187,7 +187,7 @@ function AccountCenter({ isActive, data }: Props) {
                 </InlineNotification>
               </FormField>
             )}
-            {section.key === 'userProfile' && isDevFeaturesEnabled && (
+            {section.key === 'userProfile' && (
               <FormField
                 title="sign_in_exp.account_center.gravatar.title"
                 headlineSpacing="large"
