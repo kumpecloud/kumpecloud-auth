@@ -1,7 +1,12 @@
 import { defaultTenantId, type AMemberSyncStoredConfig } from '@logto/schemas';
 import { getEnv, yes } from '@silverhand/essentials';
 
-import { amemberSyncConfigGuard, toAMemberSyncRuntimeConfig, type AMemberSyncConfig } from './types.js';
+import {
+  amemberSyncConfigGuard,
+  resolveInboundMode,
+  toAMemberSyncRuntimeConfig,
+  type AMemberSyncConfig,
+} from './types.js';
 
 const parseIntervalSeconds = (value?: string) => {
   const parsed = Number(value ?? '3600');
@@ -17,32 +22,30 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
     return;
   }
 
-  const mode = getEnv('AMEMBER_SYNC_MODE', 'api');
+  const inboundMode =
+    (getEnv('AMEMBER_SYNC_INBOUND_MODE') as AMemberSyncStoredConfig['inboundMode'] | undefined) ??
+    (getEnv('AMEMBER_SYNC_MODE', 'database') as AMemberSyncStoredConfig['inboundMode']);
   const tenantId = getEnv('AMEMBER_SYNC_TENANT_ID', defaultTenantId);
   const intervalSeconds = parseIntervalSeconds(getEnv('AMEMBER_SYNC_INTERVAL_SECONDS'));
   const syncPasswords = !yes(getEnv('AMEMBER_SYNC_SKIP_PASSWORDS'));
+  const roleSyncModeEnv = getEnv('AMEMBER_SYNC_ROLE_SYNC_MODE', 'one_way');
 
-  const base = {
-    enabled: true,
+  const config = {
+    enabled: true as const,
+    outboundEnabled: !yes(getEnv('AMEMBER_SYNC_OUTBOUND_DISABLED')),
+    roleSyncMode:
+      roleSyncModeEnv === 'two_way'
+        ? ('two_way' as const)
+        : ('one_way' as const),
     tenantId,
     intervalSeconds,
     syncPasswords,
+    inboundMode,
+    tablePrefix: getEnv('AMEMBER_TABLE_PREFIX', 'am_'),
+    databaseUrl: getEnv('AMEMBER_DATABASE_URL') || undefined,
+    apiUrl: getEnv('AMEMBER_API_URL') || undefined,
+    apiKey: getEnv('AMEMBER_API_KEY') || undefined,
   };
-
-  const config =
-    mode === 'database'
-      ? {
-          ...base,
-          mode: 'database' as const,
-          databaseUrl: getEnv('AMEMBER_DATABASE_URL') ?? '',
-          tablePrefix: getEnv('AMEMBER_TABLE_PREFIX', 'am_'),
-        }
-      : {
-          ...base,
-          mode: 'api' as const,
-          apiUrl: getEnv('AMEMBER_API_URL') ?? '',
-          apiKey: getEnv('AMEMBER_API_KEY') ?? '',
-        };
 
   const parsed = amemberSyncConfigGuard.safeParse(config);
 
@@ -71,3 +74,5 @@ export const resolveAMemberSyncConfig = (
 
   return;
 };
+
+export { resolveInboundMode };

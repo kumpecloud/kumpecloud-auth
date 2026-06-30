@@ -172,7 +172,6 @@ export const createApiAMemberDataSource = ({
     while (page * pageSize < total) {
       const body = await client.get(endpoint, {
         searchParams: {
-          _key: apiKey,
           count: pageSize,
           page,
         },

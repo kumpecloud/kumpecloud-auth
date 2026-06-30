@@ -69,7 +69,7 @@ export const startAMemberSyncScheduler = () => {
       const intervalMs = config.intervalSeconds * 1000;
 
       consoleLog.info(
-        `Starting aMember sync scheduler for tenant "${config.tenantId}" every ${config.intervalSeconds}s (${config.mode} mode)`
+        `Starting aMember sync scheduler for tenant "${config.tenantId}" every ${config.intervalSeconds}s (inbound: ${config.inboundMode})`
       );
 
       void runTenantAMemberSync(config.tenantId).catch(() => {

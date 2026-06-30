@@ -1,5 +1,5 @@
-import { buildAMemberCustomData, buildAMemberUserProfile, type AMemberCustomData } from './profile-fields.js';
-import { buildAMemberRoleName, isAMemberRoleName } from './constants.js';
+import { buildAMemberCustomData, buildAMemberUserProfile, type AMemberCustomData, wasRecentlyPushedToAMember } from './profile-fields.js';
+import { buildProductRoleName, isProductRoleName } from './constants.js';
 import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
 import {
   getAMemberUserIdFromCustomData,
@@ -35,7 +35,10 @@ export const createSlonikAMemberSyncContext = (
       select id, name, description, type, is_default as "isDefault", tenant_id as "tenantId"
       from ${rolesTable}
       where tenant_id = ${tenantId}
-        and name like ${'aMember: %'}
+        and (
+          name ~ ${'^[0-9]+:'}
+          or name like ${'aMember: %'}
+        )
     `);
 
   const findUsersIndexed = async () => {
@@ -106,10 +109,10 @@ export const createSlonikAMemberSyncContext = (
 
   return {
     findAMemberRoles,
-    createAMemberRole: async (productId, description) => {
+    createAMemberRole: async (productId, title, description) => {
       const role = {
         id: generateStandardId(),
-        name: buildAMemberRoleName(productId),
+        name: buildProductRoleName(productId, title),
         description: truncateRoleDescription(description),
         type: RoleType.User,
       };
@@ -121,10 +124,12 @@ export const createSlonikAMemberSyncContext = (
 
       return { ...role, isDefault: false, tenantId };
     },
-    updateAMemberRole: async (roleId, description) => {
+    updateAMemberRole: async (roleId, productId, title, description) => {
       await pool.query(sql`
         update ${rolesTable}
-        set description = ${truncateRoleDescription(description)}
+        set
+          name = ${buildProductRoleName(productId, title)},
+          description = ${truncateRoleDescription(description)}
         where tenant_id = ${tenantId}
           and id = ${roleId}
       `);
@@ -218,6 +223,10 @@ export const createSlonikAMemberSyncContext = (
           and id = ${userId}
       `);
 
+      if (existing && wasRecentlyPushedToAMember(existing.customData)) {
+        return;
+      }
+
       const importedPassword = syncPasswords ? resolveAMemberPasswordImport(user) : undefined;
       const shouldUpdatePassword = Boolean(
         importedPassword &&
@@ -278,9 +287,9 @@ export const createSlonikAMemberSyncContext = (
           and users_roles.user_id = ${userId}
       `);
 
-      const currentAMemberRoleIds = new Set(
+      const currentProductRoleIds = new Set(
         currentAssignments
-          .filter((assignment) => isAMemberRoleName(assignment.roleName))
+          .filter((assignment) => isProductRoleName(assignment.roleName))
           .map((assignment) => assignment.roleId)
       );
 
@@ -288,7 +297,7 @@ export const createSlonikAMemberSyncContext = (
       let removed = 0;
 
       for (const roleId of desiredRoleIds) {
-        if (!currentAMemberRoleIds.has(roleId)) {
+        if (!currentProductRoleIds.has(roleId)) {
           await pool.query(sql`
             insert into ${usersRolesTable} (tenant_id, id, user_id, role_id)
             values (${tenantId}, ${generateStandardId()}, ${userId}, ${roleId})
@@ -298,7 +307,7 @@ export const createSlonikAMemberSyncContext = (
         }
       }
 
-      for (const roleId of currentAMemberRoleIds) {
+      for (const roleId of currentProductRoleIds) {
         if (!desiredRoleIds.has(roleId)) {
           const { rowCount } = await pool.query(sql`
             delete from ${usersRolesTable}

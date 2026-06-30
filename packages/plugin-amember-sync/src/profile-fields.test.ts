@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseAMemberUserProfileFields,
   resolveDatabaseUserSelectColumns,
+  wasRecentlyPushedToAMember,
 } from './profile-fields.js';
 
 describe('resolveDatabaseUserSelectColumns', () => {
@@ -90,5 +91,23 @@ describe('parseAMemberUserProfileFields', () => {
         isApproved: true,
       })
     );
+  });
+});
+
+describe('wasRecentlyPushedToAMember', () => {
+  it('returns true when last push is within the window', () => {
+    expect(
+      wasRecentlyPushedToAMember({
+        amember: { lastOutboundPushAt: Date.now() - 1_000 },
+      })
+    ).toBe(true);
+  });
+
+  it('returns false when last push timestamp is in the future', () => {
+    expect(
+      wasRecentlyPushedToAMember({
+        amember: { lastOutboundPushAt: Date.now() + 60_000 },
+      })
+    ).toBe(false);
   });
 });

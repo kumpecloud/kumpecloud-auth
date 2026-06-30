@@ -19,8 +19,13 @@ export type LogtoUserRecord = {
 
 export type AMemberSyncContext = {
   findAMemberRoles: () => Promise<readonly Role[]>;
-  createAMemberRole: (productId: number, description: string) => Promise<Role>;
-  updateAMemberRole: (roleId: string, description: string) => Promise<void>;
+  createAMemberRole: (productId: number, title: string, description: string) => Promise<Role>;
+  updateAMemberRole: (
+    roleId: string,
+    productId: number,
+    title: string,
+    description: string
+  ) => Promise<void>;
   deleteAMemberRole: (roleId: string) => Promise<void>;
   findUsersIndexed: () => Promise<{
     byEmail: Map<string, LogtoUserRecord>;

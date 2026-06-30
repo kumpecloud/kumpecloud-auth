@@ -403,3 +403,225 @@ export const buildAMemberUserProfile = (
     ...(mergedAddress && { address: mergedAddress }),
   };
 };
+
+export type LogtoUserForAMemberOutbound = {
+  username?: string | null;
+  primaryEmail?: string | null;
+  primaryPhone?: string | null;
+  name?: string | null;
+  profile?: import('@logto/schemas').UserProfile;
+  customData?: Record<string, unknown>;
+};
+
+const splitStreetAddress = (streetAddress?: string) => {
+  if (!streetAddress) {
+    return { street: undefined, street2: undefined };
+  }
+
+  const [street, ...rest] = streetAddress.split(',').map((part) => part.trim());
+
+  return {
+    street,
+    street2: rest.length > 0 ? rest.join(', ') : undefined,
+  };
+};
+
+/** Map a Logto user record into aMember REST API user fields. */
+export const buildLogtoUserToAMemberFields = (
+  user: LogtoUserForAMemberOutbound,
+  { plainPassword }: { plainPassword?: string } = {}
+): Record<string, string> => {
+  const amember = user.customData?.amember;
+
+  const amemberData =
+    amember && typeof amember === 'object' ? (amember as Record<string, unknown>) : {};
+
+  const login =
+    user.username?.trim() ||
+    user.primaryEmail?.trim() ||
+    (typeof amemberData.login === 'string' ? amemberData.login : undefined);
+
+  if (!login) {
+    throw new Error('Cannot push user to aMember without login, username, or email');
+  }
+
+  const fields: Record<string, string> = {
+    login,
+  };
+
+  const email = user.primaryEmail?.trim();
+
+  if (email) {
+    fields.email = email;
+  }
+
+  if (plainPassword) {
+    fields.pass = plainPassword;
+  }
+
+  const profile = user.profile ?? {};
+  const givenName = profile.givenName ?? (typeof amemberData.name_f === 'string' ? amemberData.name_f : undefined);
+  const familyName = profile.familyName ?? (typeof amemberData.name_l === 'string' ? amemberData.name_l : undefined);
+
+  if (givenName) {
+    fields.name_f = givenName;
+  }
+
+  if (familyName) {
+    fields.name_l = familyName;
+  }
+
+  if (profile.birthdate) {
+    fields.birthday = profile.birthdate;
+  }
+
+  if (profile.locale) {
+    fields.lang = profile.locale;
+  }
+
+  const address = profile.address;
+
+  if (address) {
+    const { street, street2 } = splitStreetAddress(address.streetAddress);
+
+    if (street) {
+      fields.street = street;
+    }
+
+    if (street2) {
+      fields.street2 = street2;
+    }
+
+    if (address.locality) {
+      fields.city = address.locality;
+    }
+
+    if (address.region) {
+      fields.state = address.region;
+    }
+
+    if (address.postalCode) {
+      fields.zip = address.postalCode;
+    }
+
+    if (address.country) {
+      fields.country = address.country;
+    }
+  }
+
+  for (const descriptor of aMemberProfileFieldDescriptors) {
+    const value = amemberData[descriptor.customDataKey];
+
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    if (descriptor.kind === 'boolean') {
+      fields[descriptor.customDataKey] = value ? '1' : '0';
+      continue;
+    }
+
+    fields[descriptor.customDataKey] = String(value);
+  }
+
+  return fields;
+};
+
+export const markLogtoGrantedProduct = (
+  customData: Record<string, unknown>,
+  productId: number
+): Record<string, unknown> => {
+  const amember =
+    customData.amember && typeof customData.amember === 'object'
+      ? { ...(customData.amember as Record<string, unknown>) }
+      : {};
+
+  const existing = Array.isArray(amember.logtoGrantedProducts)
+    ? (amember.logtoGrantedProducts as number[])
+    : [];
+
+  if (existing.includes(productId)) {
+    return customData;
+  }
+
+  return {
+    ...customData,
+    amember: {
+      ...amember,
+      logtoGrantedProducts: [...existing, productId],
+    },
+  };
+};
+
+export const unmarkLogtoGrantedProduct = (
+  customData: Record<string, unknown>,
+  productId: number
+): Record<string, unknown> => {
+  const amember =
+    customData.amember && typeof customData.amember === 'object'
+      ? { ...(customData.amember as Record<string, unknown>) }
+      : {};
+
+  const existing = Array.isArray(amember.logtoGrantedProducts)
+    ? (amember.logtoGrantedProducts as number[])
+    : [];
+
+  return {
+    ...customData,
+    amember: {
+      ...amember,
+      logtoGrantedProducts: existing.filter((id) => id !== productId),
+    },
+  };
+};
+
+export const setAMemberLinkage = (
+  customData: Record<string, unknown>,
+  userId: number
+): Record<string, unknown> => {
+  const amember =
+    customData.amember && typeof customData.amember === 'object'
+      ? { ...(customData.amember as Record<string, unknown>) }
+      : {};
+
+  return {
+    ...customData,
+    amember: {
+      ...amember,
+      userId,
+      lastOutboundPushAt: Date.now(),
+    },
+  };
+};
+
+export const touchAMemberOutboundPush = (customData: Record<string, unknown>): Record<string, unknown> => {
+  const amember =
+    customData.amember && typeof customData.amember === 'object'
+      ? { ...(customData.amember as Record<string, unknown>) }
+      : {};
+
+  return {
+    ...customData,
+    amember: {
+      ...amember,
+      lastOutboundPushAt: Date.now(),
+    },
+  };
+};
+
+export const wasRecentlyPushedToAMember = (
+  customData: Record<string, unknown>,
+  withinMs = 120_000
+): boolean => {
+  const amember = customData.amember;
+
+  if (!amember || typeof amember !== 'object') {
+    return false;
+  }
+
+  const lastOutboundPushAt = (amember as { lastOutboundPushAt?: unknown }).lastOutboundPushAt;
+  const parsed = Number(lastOutboundPushAt);
+  const delta = Date.now() - parsed;
+
+  return Number.isFinite(parsed) && delta >= 0 && delta < withinMs;
+};

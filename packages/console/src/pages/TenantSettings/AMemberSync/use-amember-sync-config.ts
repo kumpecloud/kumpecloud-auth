@@ -1,4 +1,4 @@
-import { type AMemberSyncConfigResponse } from '@logto/schemas';
+import { type AMemberSyncConfigPatch, type AMemberSyncConfigResponse } from '@logto/schemas';
 import { useMemo } from 'react';
 import useSWR from 'swr';
 
@@ -16,7 +16,7 @@ const useAMemberSyncConfig = () => {
       error,
       isLoading,
       mutate,
-      updateConfig: async (config: Partial<AMemberSyncConfigResponse> & Record<string, unknown>) => {
+      updateConfig: async (config: AMemberSyncConfigPatch) => {
         const updated = await api
           .patch('api/configs/amember-sync', { json: config })
           .json<AMemberSyncConfigResponse>();

@@ -34,6 +34,7 @@ export class Profile {
   readonly profileValidator: ProfileValidator;
   private readonly signInExperienceValidator: SignInExperienceValidator;
   #data: InteractionProfile;
+  #pendingOutboundPassword?: string;
 
   constructor(
     private readonly libraries: Libraries,
@@ -188,7 +189,15 @@ export class Profile {
       this.profileValidator.guardProfileNotExistInCurrentUserAccount(user, passwordDigests);
     }
 
+    this.#pendingOutboundPassword = password;
     this.unsafeSet(passwordDigests);
+  }
+
+  takePendingOutboundPassword() {
+    const password = this.#pendingOutboundPassword;
+    this.#pendingOutboundPassword = undefined;
+
+    return password;
   }
 
   /**

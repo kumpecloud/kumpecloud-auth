@@ -19,9 +19,10 @@ import {
 
 describe('aMember role naming', () => {
   it('builds and parses product role names', () => {
-    expect(buildAMemberRoleName(42)).toBe('aMember: 42');
-    expect(isAMemberRoleName('aMember: 42')).toBe(true);
+    expect(buildAMemberRoleName(42, 'Premium Plan')).toBe('42: Premium Plan');
+    expect(isAMemberRoleName('42: Premium Plan')).toBe(true);
     expect(isAMemberRoleName('admin')).toBe(false);
+    expect(parseAMemberProductIdFromRoleName('42: Premium Plan')).toBe(42);
     expect(parseAMemberProductIdFromRoleName('aMember: 42')).toBe(42);
   });
 });

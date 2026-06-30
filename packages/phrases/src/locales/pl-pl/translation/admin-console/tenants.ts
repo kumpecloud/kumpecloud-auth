@@ -8,6 +8,7 @@ const tenants = {
     members: 'Członkowie',
     domains: 'Domeny',
     oidc_configs: 'Konfiguracje OIDC',
+    amember_sync: 'aMember sync',
     subscription: 'Plan i rozliczenia',
     billing_history: 'Historia rozliczeń',
   },
@@ -50,6 +51,48 @@ const tenants = {
     development: 'Development',
     production: 'Production',
   },
+  amember_sync: {
+    title: 'aMember sync',
+    description:
+      'Sync between aMember and Kumpecloud Auth. Inbound sync reads aMember via MySQL (recommended) or REST API. Outbound sync writes users, profiles, and passwords via REST API. Product roles use the format "{productId}: {title}". Role sync direction controls whether Logto role changes also update aMember.',
+    general_title: 'GENERAL',
+    inbound_title: 'INBOUND (aMember → Auth)',
+    inbound_description:
+      'Scheduled sync pulls products, users, access, and password hashes from aMember into Logto. MySQL is recommended for bulk reads.',
+    inbound_mode: 'Inbound connection',
+    inbound_api_hint: 'Inbound API credentials are configured in the Outbound section below.',
+    outbound_title: 'OUTBOUND (Auth → aMember)',
+    outbound_description:
+      'Pushes signups, profile updates, and password changes to aMember via the REST API. Product role grants require two-way role sync.',
+    outbound_enabled: 'Push signups, profiles, and passwords to aMember',
+    enabled: 'Enable automatic inbound sync',
+    interval_seconds: 'Inbound sync interval (seconds)',
+    sync_passwords: 'Sync password hashes from aMember',
+    role_sync_mode: 'Product role sync',
+    role_sync_one_way: 'One-way (aMember → Auth)',
+    role_sync_two_way: 'Two-way',
+    role_sync_hint:
+      'One-way: scheduled inbound sync applies aMember access to Logto product roles; manual Logto role changes do not update aMember. Two-way: manual Logto role grants and revocations also create or expire lifetime aMember access.',
+
+    identity_hint:
+      'User passkeys, social identities, MFA settings, and other Logto profile data are never modified by aMember sync.',
+    mode_api: 'aMember REST API',
+    mode_database: 'MariaDB / MySQL database (recommended)',
+    api_url: 'API URL',
+    api_key: 'API key',
+    database_url: 'Database URL',
+    table_prefix: 'Table prefix',
+    secret_saved_placeholder: 'Saved — leave blank to keep current value',
+    hybrid_recommended:
+      'Recommended: use MySQL for inbound sync and the REST API for outbound push (signups, profiles, and passwords). Enable two-way role sync only if Logto should also grant aMember access.',
+    database_configured: 'Database connection saved.',
+    database_not_configured: 'Database URL is required for MySQL inbound sync.',
+    api_configured: 'API credentials saved.',
+    api_not_configured: 'API URL and key are required for outbound sync.',
+    run_now: 'Run inbound sync now',
+    sync_triggered: 'aMember inbound sync started.',
+  },
+
   deletion_card: {
     title: 'USUWANIE',
     tenant_deletion: 'Usuń najemcę',

@@ -6,6 +6,7 @@ import {
   type AMemberSyncConfigResponse,
   type AMemberSyncStoredConfig,
 } from '@logto/schemas';
+import { resolveInboundMode } from '@logto/plugin-amember-sync';
 
 import koaGuard from '#src/middleware/koa-guard.js';
 
@@ -13,21 +14,31 @@ import type { ManagementApiRouter, RouterInitArgs } from '../types.js';
 
 import { runTenantAMemberSync } from '../../libraries/amember-sync/index.js';
 
-const toResponse = (config: AMemberSyncStoredConfig): AMemberSyncConfigResponse =>
-  amemberSyncConfigResponseGuard.parse({
-    ...config,
+const toResponse = (config: AMemberSyncStoredConfig): AMemberSyncConfigResponse => {
+  const { mode: _deprecatedMode, ...rest } = config;
+
+  return amemberSyncConfigResponseGuard.parse({
+    ...rest,
+    inboundMode: resolveInboundMode(config),
     apiKeySet: Boolean(config.apiKey),
     databaseUrlSet: Boolean(config.databaseUrl),
   });
+};
 
 const mergeAMemberSyncConfig = (
   existing: AMemberSyncStoredConfig,
   patch: AMemberSyncConfigPatch
 ): AMemberSyncStoredConfig => {
+  const inboundMode =
+    patch.inboundMode ?? patch.mode ?? existing.inboundMode ?? existing.mode ?? 'database';
+
   const merged = {
     ...existing,
     ...patch,
+    inboundMode,
   };
+
+  delete (merged as { mode?: string }).mode;
 
   if (!patch.apiKey?.trim()) {
     merged.apiKey = existing.apiKey;

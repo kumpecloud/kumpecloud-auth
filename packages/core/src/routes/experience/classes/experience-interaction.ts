@@ -12,6 +12,7 @@ import { maskEmail, maskPhone } from '@logto/shared';
 import { conditional, trySafe } from '@silverhand/essentials';
 
 import RequestError from '#src/errors/RequestError/index.js';
+import { pushUserPasswordToAMember, pushUpdatedUserToAMember } from '#src/libraries/amember-sync/outbound.js';
 import { buildUserPasswordPayload } from '#src/libraries/user.utils.js';
 import { type LogEntry } from '#src/middleware/koa-audit-log.js';
 import type TenantContext from '#src/tenants/TenantContext.js';
@@ -306,7 +307,19 @@ export default class ExperienceInteraction {
       hasVerifiedSsoIdentity: this.hasVerifiedSsoIdentity,
     });
 
-    const user = await this.provisionLibrary.createUser(this.profile.data);
+    const plainPassword =
+      this.profile.takePendingOutboundPassword() ??
+      (verificationId
+        ? (() => {
+            const record = this.getVerificationRecordById(verificationId);
+
+            return record.type === VerificationType.NewPasswordIdentity
+              ? record.takePendingOutboundPassword()
+              : undefined;
+          })()
+        : undefined);
+
+    const user = await this.provisionLibrary.createUser(this.profile.data, plainPassword);
     log?.append({ user });
 
     this.userId = user.id;
@@ -488,6 +501,7 @@ export default class ExperienceInteraction {
     // Forgot Password: No need to verify MFAs and profile data for forgot password flow
     if (this.#interactionEvent === InteractionEvent.ForgotPassword) {
       const { passwordEncrypted, passwordEncryptionMethod } = this.profile.data;
+      const plainPassword = this.profile.takePendingOutboundPassword();
 
       assertThat(
         passwordEncrypted && passwordEncryptionMethod,
@@ -500,6 +514,10 @@ export default class ExperienceInteraction {
           passwordEncryptionMethod,
         }),
       });
+
+      if (plainPassword) {
+        pushUserPasswordToAMember(this.tenant.id, user.id, plainPassword);
+      }
 
       await this.cleanUp();
 
@@ -550,6 +568,8 @@ export default class ExperienceInteraction {
     const userMfaVerifications = this.mfa.toUserMfaVerifications();
     const { mfaVerifications } = userMfaVerifications;
 
+    const plainPassword = this.profile.takePendingOutboundPassword();
+
     // Update user profile
     const updatedUser = await userQueries.updateUserById(user.id, {
       ...rest,
@@ -583,6 +603,12 @@ export default class ExperienceInteraction {
       },
       lastSignInAt: Date.now(),
     });
+
+    if (plainPassword) {
+      pushUserPasswordToAMember(this.tenant.id, user.id, plainPassword);
+    } else if (Object.keys(rest).length > 0) {
+      pushUpdatedUserToAMember(this.tenant.id, user.id);
+    }
 
     // Sync SSO identity
     if (syncedEnterpriseSsoIdentity) {
