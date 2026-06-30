@@ -1,6 +1,6 @@
 import { type AMemberSyncConfigResponse } from '@logto/schemas';
-import { useEffect } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useEffect, useMemo } from 'react';
+import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 
@@ -10,6 +10,8 @@ import PageMeta from '@/components/PageMeta';
 import Button from '@/ds-components/Button';
 import DynamicT from '@/ds-components/DynamicT';
 import FormField from '@/ds-components/FormField';
+import InlineNotification from '@/ds-components/InlineNotification';
+import Select, { type Option } from '@/ds-components/Select';
 import Switch from '@/ds-components/Switch';
 import TextInput from '@/ds-components/TextInput';
 import { trySubmitSafe } from '@/utils/form';
@@ -19,7 +21,9 @@ import useAMemberSyncConfig from './use-amember-sync-config';
 
 type FormData = {
   enabled: boolean;
-  mode: 'api' | 'database';
+  outboundEnabled: boolean;
+  roleSyncMode: 'one_way' | 'two_way';
+  inboundMode: 'api' | 'database';
   intervalSeconds: number;
   syncPasswords: boolean;
   tablePrefix: string;
@@ -30,7 +34,9 @@ type FormData = {
 
 const defaultFormData: FormData = {
   enabled: false,
-  mode: 'api',
+  outboundEnabled: true,
+  roleSyncMode: 'one_way',
+  inboundMode: 'database',
   intervalSeconds: 3600,
   syncPasswords: true,
   tablePrefix: 'am_',
@@ -42,7 +48,9 @@ const defaultFormData: FormData = {
 const toFormData = (data?: AMemberSyncConfigResponse): FormData => ({
   ...defaultFormData,
   enabled: data?.enabled ?? defaultFormData.enabled,
-  mode: data?.mode ?? defaultFormData.mode,
+  outboundEnabled: data?.outboundEnabled ?? defaultFormData.outboundEnabled,
+  roleSyncMode: data?.roleSyncMode ?? defaultFormData.roleSyncMode,
+  inboundMode: data?.inboundMode ?? defaultFormData.inboundMode,
   intervalSeconds: data?.intervalSeconds ?? defaultFormData.intervalSeconds,
   syncPasswords: data?.syncPasswords ?? defaultFormData.syncPasswords,
   tablePrefix: data?.tablePrefix ?? defaultFormData.tablePrefix,
@@ -59,11 +67,39 @@ function AMemberSyncSettings() {
     register,
     reset,
     watch,
+    control,
     handleSubmit,
     formState: { isDirty, isSubmitting },
   } = methods;
-  const [enabled, mode] = watch(['enabled', 'mode']);
-  const isApiMode = mode === 'api';
+  const [enabled, inboundMode, outboundEnabled, apiUrl, apiKey, databaseUrl] = watch([
+    'enabled',
+    'inboundMode',
+    'outboundEnabled',
+    'apiUrl',
+    'apiKey',
+    'databaseUrl',
+  ]);
+  const isDatabaseInbound = inboundMode === 'database';
+  const needsApiCredentials = outboundEnabled || inboundMode === 'api';
+
+  const inboundModeOptions = useMemo<Array<Option<'api' | 'database'>>>(
+    () => [
+      { value: 'database', title: t('tenants.amember_sync.mode_database') },
+      { value: 'api', title: t('tenants.amember_sync.mode_api') },
+    ],
+    [t]
+  );
+
+  const roleSyncModeOptions = useMemo<Array<Option<'one_way' | 'two_way'>>>(
+    () => [
+      { value: 'one_way', title: t('tenants.amember_sync.role_sync_one_way') },
+      { value: 'two_way', title: t('tenants.amember_sync.role_sync_two_way') },
+    ],
+    [t]
+  );
+
+  const databaseConfigured = Boolean(data?.databaseUrlSet || databaseUrl.trim());
+  const apiConfigured = Boolean(data?.apiKeySet || (apiUrl.trim() && apiKey?.trim()));
 
   useEffect(() => {
     if (data) {
@@ -75,13 +111,15 @@ function AMemberSyncSettings() {
     trySubmitSafe(async (formData) => {
       await updateConfig({
         enabled: formData.enabled,
-        mode: formData.mode,
+        outboundEnabled: formData.outboundEnabled,
+        roleSyncMode: formData.roleSyncMode,
+        inboundMode: formData.inboundMode,
         intervalSeconds: Number(formData.intervalSeconds),
         syncPasswords: formData.syncPasswords,
         tablePrefix: formData.tablePrefix,
-        apiUrl: formData.apiUrl,
-        apiKey: formData.apiKey,
-        databaseUrl: formData.databaseUrl,
+        apiUrl: formData.apiUrl || undefined,
+        apiKey: formData.apiKey || undefined,
+        databaseUrl: formData.databaseUrl || undefined,
       });
       toast.success(t('general.saved'));
     })
@@ -98,6 +136,9 @@ function AMemberSyncSettings() {
       <p className={styles.hint}>
         <DynamicT forKey="tenants.amember_sync.description" />
       </p>
+      <InlineNotification className={styles.callout}>
+        <DynamicT forKey="tenants.amember_sync.hybrid_recommended" />
+      </InlineNotification>
       <FormProvider {...methods}>
         <DetailsForm
           isDirty={isDirty}
@@ -118,22 +159,95 @@ function AMemberSyncSettings() {
               <FormField title="tenants.amember_sync.sync_passwords">
                 <Switch {...register('syncPasswords')} />
               </FormField>
+              <FormField title="tenants.amember_sync.role_sync_mode">
+                <Controller
+                  name="roleSyncMode"
+                  control={control}
+                  render={({ field: { value, onChange } }) => (
+                    <Select
+                      value={value}
+                      options={roleSyncModeOptions}
+                      onChange={(next) => {
+                        if (next) {
+                          onChange(next);
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </FormField>
+              <p className={styles.hint}>
+                <DynamicT forKey="tenants.amember_sync.role_sync_hint" />
+              </p>
               <p className={styles.hint}>
                 <DynamicT forKey="tenants.amember_sync.identity_hint" />
               </p>
             </div>
           </FormCard>
 
-          <FormCard title="tenants.amember_sync.connection_title">
+          <FormCard title="tenants.amember_sync.inbound_title">
+            <p className={styles.hint}>
+              <DynamicT forKey="tenants.amember_sync.inbound_description" />
+            </p>
             <div className={styles.card}>
-              <FormField title="tenants.amember_sync.mode">
-                <select {...register('mode')}>
-                  <option value="api">{t('tenants.amember_sync.mode_api')}</option>
-                  <option value="database">{t('tenants.amember_sync.mode_database')}</option>
-                </select>
+              <FormField title="tenants.amember_sync.inbound_mode">
+                <Controller
+                  name="inboundMode"
+                  control={control}
+                  render={({ field: { value, onChange } }) => (
+                    <Select
+                      value={value}
+                      options={inboundModeOptions}
+                      onChange={(next) => {
+                        if (next) {
+                          onChange(next);
+                        }
+                      }}
+                    />
+                  )}
+                />
               </FormField>
 
-              {isApiMode ? (
+              {isDatabaseInbound ? (
+                <>
+                  <FormField title="tenants.amember_sync.database_url">
+                    <TextInput
+                      type="password"
+                      placeholder={
+                        data?.databaseUrlSet
+                          ? t('tenants.amember_sync.secret_saved_placeholder')
+                          : 'mysql://user:pass@host:3306/amember'
+                      }
+                      {...register('databaseUrl')}
+                    />
+                  </FormField>
+                  <p className={styles.hint}>
+                    {databaseConfigured
+                      ? t('tenants.amember_sync.database_configured')
+                      : t('tenants.amember_sync.database_not_configured')}
+                  </p>
+                  <FormField title="tenants.amember_sync.table_prefix">
+                    <TextInput {...register('tablePrefix')} />
+                  </FormField>
+                </>
+              ) : (
+                <p className={styles.hint}>
+                  <DynamicT forKey="tenants.amember_sync.inbound_api_hint" />
+                </p>
+              )}
+            </div>
+          </FormCard>
+
+          <FormCard title="tenants.amember_sync.outbound_title">
+            <p className={styles.hint}>
+              <DynamicT forKey="tenants.amember_sync.outbound_description" />
+            </p>
+            <div className={styles.card}>
+              <FormField title="tenants.amember_sync.outbound_enabled">
+                <Switch {...register('outboundEnabled')} />
+              </FormField>
+
+              {needsApiCredentials ? (
                 <>
                   <FormField title="tenants.amember_sync.api_url">
                     <TextInput
@@ -152,25 +266,13 @@ function AMemberSyncSettings() {
                       {...register('apiKey')}
                     />
                   </FormField>
+                  <p className={styles.hint}>
+                    {apiConfigured
+                      ? t('tenants.amember_sync.api_configured')
+                      : t('tenants.amember_sync.api_not_configured')}
+                  </p>
                 </>
-              ) : (
-                <>
-                  <FormField title="tenants.amember_sync.database_url">
-                    <TextInput
-                      type="password"
-                      placeholder={
-                        data?.databaseUrlSet
-                          ? t('tenants.amember_sync.secret_saved_placeholder')
-                          : 'mysql://user:pass@host:3306/amember'
-                      }
-                      {...register('databaseUrl')}
-                    />
-                  </FormField>
-                  <FormField title="tenants.amember_sync.table_prefix">
-                    <TextInput {...register('tablePrefix')} />
-                  </FormField>
-                </>
-              )}
+              ) : null}
             </div>
           </FormCard>
         </DetailsForm>

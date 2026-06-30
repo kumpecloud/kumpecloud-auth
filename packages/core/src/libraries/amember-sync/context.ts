@@ -1,6 +1,7 @@
 import {
-  buildAMemberRoleName,
-  isAMemberRoleName,
+  buildProductRoleName,
+  isProductRoleName,
+  wasRecentlyPushedToAMember,
   type AMemberSyncContext,
   type AMemberUser,
   type LogtoUserRecord,
@@ -44,7 +45,8 @@ export const createAMemberSyncContext = (
     queries.pool.any<Role>(sql`
       select ${sql.join(Object.values(roleFields), sql`, `)}
       from ${rolesTable}
-      where ${roleFields.name} like ${'aMember: %'}
+      where ${roleFields.name} ~ ${'^[0-9]+:'}
+        or ${roleFields.name} like ${'aMember: %'}
     `);
 
   const findUsersIndexed = async () => {
@@ -108,15 +110,18 @@ export const createAMemberSyncContext = (
 
   return {
     findAMemberRoles,
-    createAMemberRole: async (productId, description) =>
+    createAMemberRole: async (productId, title, description) =>
       insertRole({
         id: generateStandardId(),
-        name: buildAMemberRoleName(productId),
+        name: buildProductRoleName(productId, title),
         description: truncateRoleDescription(description),
         type: RoleType.User,
       }),
-    updateAMemberRole: async (roleId, description) => {
-      await updateRoleById(roleId, { description: truncateRoleDescription(description) });
+    updateAMemberRole: async (roleId, productId, title, description) => {
+      await updateRoleById(roleId, {
+        name: buildProductRoleName(productId, title),
+        description: truncateRoleDescription(description),
+      });
     },
     deleteAMemberRole: async (roleId) => {
       await deleteRoleById(roleId);
@@ -161,6 +166,11 @@ export const createAMemberSyncContext = (
 
       const existingUsers = await queries.users.findUsersByIds([userId]);
       const existing = existingUsers[0];
+
+      if (existing && wasRecentlyPushedToAMember((existing.customData ?? {}) as Record<string, unknown>)) {
+        return;
+      }
+
       const passwordPayload = buildPasswordPayload(user, existing);
       const suspensionUpdate = buildAMemberSuspensionUpdate(user);
 
@@ -193,21 +203,21 @@ export const createAMemberSyncContext = (
       const currentRoleIds = currentAssignments.map(({ roleId }) => roleId);
       const currentRoles =
         currentRoleIds.length > 0 ? await findRolesByRoleIds(currentRoleIds) : [];
-      const currentAMemberRoleIds = new Set(
-        currentRoles.filter((role) => isAMemberRoleName(role.name)).map((role) => role.id)
+      const currentProductRoleIds = new Set(
+        currentRoles.filter((role) => isProductRoleName(role.name)).map((role) => role.id)
       );
 
       let added = 0;
       let removed = 0;
 
       for (const roleId of desiredRoleIds) {
-        if (!currentAMemberRoleIds.has(roleId)) {
+        if (!currentProductRoleIds.has(roleId)) {
           await insertUsersRoles([{ id: generateStandardId(), userId, roleId }]);
           added += 1;
         }
       }
 
-      for (const roleId of currentAMemberRoleIds) {
+      for (const roleId of currentProductRoleIds) {
         if (!desiredRoleIds.has(roleId)) {
           try {
             await deleteUsersRolesByUserIdAndRoleId(userId, roleId);

@@ -51,6 +51,7 @@ export class NewPasswordIdentityVerification
 
   private passwordEncrypted?: string;
   private passwordEncryptionMethod?: UsersPasswordEncryptionMethod.Argon2i;
+  private pendingOutboundPassword?: string;
 
   private readonly profileValidator: ProfileValidator;
   private readonly signInExperienceValidator: SignInExperienceValidator;
@@ -95,8 +96,16 @@ export class NewPasswordIdentityVerification
     const { passwordEncrypted, passwordEncryptionMethod } =
       await passwordValidator.createPasswordDigest(password);
 
+    this.pendingOutboundPassword = password;
     this.passwordEncrypted = passwordEncrypted;
     this.passwordEncryptionMethod = passwordEncryptionMethod;
+  }
+
+  takePendingOutboundPassword() {
+    const password = this.pendingOutboundPassword;
+    this.pendingOutboundPassword = undefined;
+
+    return password;
   }
 
   toUserProfile() {

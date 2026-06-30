@@ -1,20 +1,51 @@
-/** Prefix for roles synced from aMember products. */
-export const amemberRolePrefix = 'aMember: ';
-
 /** Custom data key used to link Logto users back to aMember user IDs. */
 export const amemberCustomDataKey = 'amember';
 
-export const buildAMemberRoleName = (productId: number | string) =>
-  `${amemberRolePrefix}${productId}`;
+/** @deprecated Use product role name format `{productId}: {title}` instead. */
+export const amemberRolePrefix = 'aMember: ';
 
-export const isAMemberRoleName = (roleName: string) => roleName.startsWith(amemberRolePrefix);
+const productRoleNamePattern = /^(\d+):\s*/u;
+const legacyRoleNamePattern = /^aMember:\s*(\d+)$/u;
 
-export const parseAMemberProductIdFromRoleName = (roleName: string): number | undefined => {
-  if (!isAMemberRoleName(roleName)) {
-    return;
+export const buildProductRoleName = (
+  productId: number | string,
+  title: string,
+  maxLength = 128
+): string => {
+  const prefix = `${productId}: `;
+  const maxTitleLength = Math.max(maxLength - prefix.length, 1);
+  const trimmedTitle = title.trim().slice(0, maxTitleLength);
+
+  return `${prefix}${trimmedTitle}`;
+};
+
+/** @deprecated Use {@link buildProductRoleName} instead. */
+export const buildAMemberRoleName = (productId: number | string, title = '') =>
+  title ? buildProductRoleName(productId, title) : `${productId}:`;
+
+export const isProductRoleName = (roleName: string) =>
+  productRoleNamePattern.test(roleName) || legacyRoleNamePattern.test(roleName);
+
+/** @deprecated Use {@link isProductRoleName} instead. */
+export const isAMemberRoleName = isProductRoleName;
+
+export const parseProductIdFromRoleName = (roleName: string): number | undefined => {
+  const productMatch = productRoleNamePattern.exec(roleName);
+
+  if (productMatch) {
+    const productId = Number(productMatch[1]);
+
+    return Number.isFinite(productId) ? productId : undefined;
   }
 
-  const productId = Number(roleName.slice(amemberRolePrefix.length));
+  const legacyMatch = legacyRoleNamePattern.exec(roleName);
 
-  return Number.isFinite(productId) ? productId : undefined;
+  if (legacyMatch) {
+    const productId = Number(legacyMatch[1]);
+
+    return Number.isFinite(productId) ? productId : undefined;
+  }
 };
+
+/** @deprecated Use {@link parseProductIdFromRoleName} instead. */
+export const parseAMemberProductIdFromRoleName = parseProductIdFromRoleName;

@@ -20,6 +20,7 @@ import { generateStandardId } from '@logto/shared';
 import { condArray, conditional, conditionalArray, trySafe } from '@silverhand/essentials';
 
 import { EnvSet } from '#src/env-set/index.js';
+import { pushCreatedUserToAMember } from '#src/libraries/amember-sync/outbound.js';
 import { truncateMembershipDelta } from '#src/libraries/hook/utils.js';
 import { buildUserPasswordPayload } from '#src/libraries/user.utils.js';
 import type TenantContext from '#src/tenants/TenantContext.js';
@@ -55,7 +56,7 @@ export class ProvisionLibrary {
    * - Provision all JIT organizations for the user if necessary.
    * - Assign the first user to the admin role and the default tenant organization membership. [OSS only]
    */
-  async createUser(profile: InteractionProfile) {
+  async createUser(profile: InteractionProfile, plainPassword?: string) {
     const {
       libraries: {
         users: { generateUserId, insertUser },
@@ -131,6 +132,8 @@ export class ProvisionLibrary {
     this.ctx.appendDataHookContext('User.Created', { user });
 
     this.triggerAnalyticReports(user);
+
+    pushCreatedUserToAMember(this.tenantContext.id, user, plainPassword);
 
     return user;
   }

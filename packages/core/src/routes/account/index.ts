@@ -12,6 +12,7 @@ import { conditional } from '@silverhand/essentials';
 import { z } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
+import { pushUserPasswordToAMember, pushUpdatedUserToAMember } from '#src/libraries/amember-sync/outbound.js';
 import { buildUserPasswordPayloadFromPassword } from '#src/libraries/user.utils.js';
 import koaGuard from '#src/middleware/koa-guard.js';
 import assertThat from '#src/utils/assert-that.js';
@@ -34,7 +35,7 @@ import { getAccountCenterFilteredProfile, getScopedProfile } from './utils/get-s
 import { hasSecurityVerificationMethod } from './utils/has-security-verification-method.js';
 
 export default function accountRoutes<T extends UserRouter>(...args: RouterInitArgs<T>) {
-  const [router, { queries, libraries }] = args;
+  const [router, { queries, libraries, id: tenantId }] = args;
   const {
     users: { updateUserById, findUserById },
     signInExperiences: { findDefaultSignInExperience },
@@ -138,6 +139,8 @@ export default function accountRoutes<T extends UserRouter>(...args: RouterInitA
 
       ctx.appendDataHookContext('User.Data.Updated', { user: updatedUser });
 
+      pushUpdatedUserToAMember(tenantId, userId);
+
       const { profile } = await getScopedProfile(
         queries,
         libraries,
@@ -178,6 +181,8 @@ export default function accountRoutes<T extends UserRouter>(...args: RouterInitA
       });
 
       ctx.appendDataHookContext('User.Data.Updated', { user: updatedUser });
+
+      pushUpdatedUserToAMember(tenantId, userId);
 
       const { profile } = await getScopedProfile(
         queries,
@@ -224,6 +229,8 @@ export default function accountRoutes<T extends UserRouter>(...args: RouterInitA
         userId,
         await buildUserPasswordPayloadFromPassword(password)
       );
+
+      pushUserPasswordToAMember(tenantId, userId, password);
 
       ctx.appendDataHookContext('User.Data.Updated', { user: updatedUser });
 

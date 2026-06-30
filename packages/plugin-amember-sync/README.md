@@ -1,59 +1,82 @@
 # @logto/plugin-amember-sync
 
-Sync aMember products, users, and access records into Kumpecloud Auth (Logto fork).
+Bidirectional sync between aMember and Kumpecloud Auth (Logto fork).
+
+## Recommended setup (hybrid)
+
+| Direction | Connection | Why |
+|-----------|------------|-----|
+| **Inbound** (aMember → Auth) | **MySQL / MariaDB** | Efficient bulk reads for products, users, access, and password hashes |
+| **Outbound** (Auth → aMember) | **REST API** | Safe writes with aMember business logic for signups, profiles, passwords, and access grants |
+
+Configure both database credentials and API credentials in Console. Inbound mode defaults to `database`; outbound always uses the API.
 
 ## What it syncs
 
+### Inbound (aMember → Auth)
+
 | aMember | Kumpecloud Auth |
 |---------|-----------------|
-| Products | User roles named `aMember: {product_id}` with description set to the product title |
-| Users (email/login + bcrypt password hash) | Users matched by email or username (`login`), with profile fields stored under `customData.amember` and mapped standard `profile` fields |
-| `mobile_area_code` + `mobile_number` | `primaryPhone` (normalized international format) |
-| Profile columns (see below) | `customData.amember.*` (aMember column names preserved) and standard `profile` fields where applicable |
-
-Profile columns synced into `customData.amember`: `birthday`, `pushover_key`, `subusers_parent_id`, `pin`, `comment`, `i_agree`, `is_approved`, `is_locked`, `unsubscribed`, `status`, `name_f`, `name_l`, `street`, `street2`, `city`, `state`, `zip`, `country`, `lang`, plus `userId` for linkage.
-
-Standard `profile` mappings: `name_f` → `givenName`, `name_l` → `familyName`, `birthday` → `birthdate`, `lang` → `locale`, and address fields (`street`/`street2` → `address.streetAddress`, `city` → `address.locality`, `state` → `address.region`, `zip` → `address.postalCode`, `country` → `address.country`, plus `address.formatted`).
+| Products | User roles named `{product_id}: {title}` with description set to the product title |
+| Users (email/login + password hash) | Users matched by `customData.amember.userId`, email, or username (`login`) |
 | Active access records | Role assignments on the matching user |
 
-Only roles whose names start with `aMember:` are created, updated, or deleted by this plugin. All other roles and assignments are left untouched.
+Only roles whose names match `{product_id}: {title}` (or legacy `aMember: {product_id}`) are managed by product/access sync.
 
-Inactive, deleted, or removed aMember users have all `aMember:` role assignments revoked. When they become active again, roles are restored from current aMember access on the next sync.
+### Outbound (Auth → aMember)
 
-`is_locked` from aMember is synced to Logto `isSuspended`, which blocks sign-in and revokes active sessions. Locked users keep their role assignments so access is restored automatically when the account is unlocked.
+When **outbound sync** is enabled:
 
-User passkeys, social identities, MFA/`logtoConfig`, and other non-synced profile fields are never modified by sync.
+| Auth event | aMember action |
+|------------|----------------|
+| User signup | `POST /users` with login, email, profile, plaintext password when available |
+| Profile / custom data update | `PUT /users/{id}` |
+| Password change | `PUT /users/{id}` with `pass` |
+| Manual role grant (two-way role sync only) | `POST /access` with lifetime expiry (`2037-12-31`) |
+| Manual role revocation (two-way role sync only) | Expire matching access record |
+
+### Product role sync direction
+
+| Mode | Inbound (aMember → Auth) | Outbound roles (Auth → aMember) |
+|------|--------------------------|----------------------------------|
+| **One-way** (default) | aMember access drives Logto product roles | Logto role changes are **not** pushed to aMember |
+| **Two-way** | Same as one-way | Manual Logto role grants/revocations update aMember access |
 
 ## Configuration
 
 ### Console UI
 
-Open **Settings → aMember sync** in the Admin Console to configure connection credentials, enable automatic sync, and trigger a manual run.
+Open **Settings → aMember sync**:
+
+1. **General** — enable inbound sync, interval, password hash import, product role sync direction
+2. **Inbound** — choose MySQL (recommended) or API; provide database URL when using MySQL
+3. **Outbound** — enable push to aMember; provide API URL and key (also used for inbound when inbound mode is API)
 
 ### Environment variables (optional fallback)
 
 ```bash
 AMEMBER_SYNC_ENABLED=true
+AMEMBER_SYNC_OUTBOUND_DISABLED=true   # optional; outbound on by default
+AMEMBER_SYNC_ROLE_SYNC_MODE=one_way   # or two_way
 AMEMBER_SYNC_TENANT_ID=default
 AMEMBER_SYNC_INTERVAL_SECONDS=3600
 AMEMBER_SYNC_SKIP_PASSWORDS=true        # optional
 
-# API mode
-AMEMBER_SYNC_MODE=api
-AMEMBER_API_URL=https://billing.example.com/amember/api
-AMEMBER_API_KEY=your-rest-api-key
-
-# MariaDB / MySQL mode
-AMEMBER_SYNC_MODE=database
+# Inbound (default: database)
+AMEMBER_SYNC_INBOUND_MODE=database      # or AMEMBER_SYNC_MODE=database
 AMEMBER_DATABASE_URL=mysql://user:pass@host:3306/amember
 AMEMBER_TABLE_PREFIX=am_
+
+# Outbound (and inbound when inbound mode is api)
+AMEMBER_API_URL=https://billing.example.com/amember/api
+AMEMBER_API_KEY=your-rest-api-key
 ```
 
 Console-stored configuration takes precedence over environment variables when enabled.
 
-## Running sync
+## Running inbound sync
 
-**Automatic (core):** When enabled in Console (or via `AMEMBER_SYNC_ENABLED=true`), core runs sync on startup and on the configured interval.
+**Automatic (core):** When enabled, core runs inbound sync on startup and on the configured interval. Outbound sync runs inline on user lifecycle events.
 
 **Manual (CLI):**
 
@@ -64,15 +87,6 @@ pnpm cli amember sync --tenant default
 
 **Manual (API):** `POST /api/configs/amember-sync/run`
 
-## Password notes
+## aMember API permissions (outbound)
 
-aMember stores password hashes, not plaintext. Supported import formats:
-
-| aMember field | Format | Example prefix |
-|---------------|--------|----------------|
-| `crypt_pass` (database sync) | Unix MD5 crypt | `$1$` |
-| `pass` (API sync fallback) | phpass portable hash | `$P$` / `$H$` |
-| `pass` (API sync fallback) | bcrypt | `$2y$` / `$2a$` |
-| `pass` (API sync fallback) | raw MD5 hex | 32 hex chars |
-
-Database mode reads `am_user.crypt_pass` only. API mode may still supply legacy `pass` values when `crypt_pass` is unavailable. Hashes are imported only when they change, so users who set up passkeys or change passwords in Logto are not overwritten on every sync. PHP `$2y$` bcrypt hashes are normalized to `$2a$` for Node compatibility.
+Enable the API module and grant your key: `users` (read/write), `access` (read/write).

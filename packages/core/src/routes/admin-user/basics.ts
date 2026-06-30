@@ -13,6 +13,11 @@ import { conditional, yes } from '@silverhand/essentials';
 import { boolean, literal, nativeEnum, object, string } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
+import {
+  pushCreatedUserToAMember,
+  pushUpdatedUserToAMember,
+  pushUserPasswordToAMember,
+} from '#src/libraries/amember-sync/outbound.js';
 import { buildManagementApiContext } from '#src/libraries/hook/utils.js';
 import {
   buildUpdatedUserLogtoConfig,
@@ -129,6 +134,8 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         customData,
       });
 
+      pushUpdatedUserToAMember(tenantId, userId);
+
       ctx.body = user.customData;
 
       return next();
@@ -208,6 +215,8 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
       const user = await updateUserById(userId, {
         profile,
       });
+
+      pushUpdatedUserToAMember(tenantId, userId);
 
       ctx.body = user.profile;
 
@@ -297,6 +306,8 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         ...conditional(profile && { profile }),
       });
 
+      pushCreatedUserToAMember(tenantId, user, password);
+
       ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
       return next();
     }
@@ -328,6 +339,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
       await checkIdentifierCollision(body, userId);
 
       const updatedUser = await updateUserById(userId, body, 'replace');
+      pushUpdatedUserToAMember(tenantId, userId);
       ctx.body = transpileAdminUserProfileResponse(updatedUser, {}, { gravatarEnabled: ctx.gravatarEnabled });
 
       return next();
@@ -354,6 +366,8 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         userId,
         await buildUserPasswordPayloadFromPassword(password)
       );
+
+      pushUserPasswordToAMember(tenantId, userId, password);
 
       ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
 

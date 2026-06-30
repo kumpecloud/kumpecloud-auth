@@ -54,28 +54,84 @@ export const amemberSyncModeGuard = z.enum(['api', 'database']);
 
 export type AMemberSyncMode = z.infer<typeof amemberSyncModeGuard>;
 
-const apiConfigGuard = z.object({
-  mode: z.literal('api'),
-  apiUrl: z.string().url(),
-  apiKey: z.string().min(1),
-});
+export const amemberRoleSyncModeGuard = z.enum(['one_way', 'two_way']);
 
-const databaseConfigGuard = z.object({
-  mode: z.literal('database'),
-  databaseUrl: z.string().min(1),
-  tablePrefix: z.string().default('am_'),
-});
+export type AMemberRoleSyncMode = z.infer<typeof amemberRoleSyncModeGuard>;
 
 export const amemberSyncConfigGuard = z
   .object({
-    enabled: z.boolean(),
+    enabled: z.literal(true),
+    outboundEnabled: z.boolean().default(true),
+    roleSyncMode: amemberRoleSyncModeGuard.default('one_way'),
     tenantId: z.string().min(1),
     intervalSeconds: z.number().int().positive(),
     syncPasswords: z.boolean().default(true),
+    inboundMode: amemberSyncModeGuard,
+    tablePrefix: z.string().default('am_'),
+    apiUrl: z.string().url().optional(),
+    apiKey: z.string().min(1).optional(),
+    databaseUrl: z.string().min(1).optional(),
   })
-  .and(z.discriminatedUnion('mode', [apiConfigGuard, databaseConfigGuard]));
+  .superRefine((config, context) => {
+    if (config.inboundMode === 'database' && !config.databaseUrl) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'databaseUrl is required when inboundMode is database',
+        path: ['databaseUrl'],
+      });
+    }
+
+    if (config.inboundMode === 'api') {
+      if (!config.apiUrl) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'apiUrl is required when inboundMode is api',
+          path: ['apiUrl'],
+        });
+      }
+
+      if (!config.apiKey) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'apiKey is required when inboundMode is api',
+          path: ['apiKey'],
+        });
+      }
+    }
+
+    if (config.outboundEnabled) {
+      if (!config.apiUrl) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'apiUrl is required when outbound sync is enabled',
+          path: ['apiUrl'],
+        });
+      }
+
+      if (!config.apiKey) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'apiKey is required when outbound sync is enabled',
+          path: ['apiKey'],
+        });
+      }
+    }
+  });
 
 export type AMemberSyncConfig = z.infer<typeof amemberSyncConfigGuard>;
+
+export const resolveInboundMode = (
+  stored: Pick<AMemberSyncStoredConfig, 'inboundMode' | 'mode'>
+): AMemberSyncMode => stored.inboundMode ?? stored.mode ?? 'database';
+
+export const hasOutboundApiCredentials = (
+  config: Pick<AMemberSyncConfig, 'apiUrl' | 'apiKey'>
+): config is AMemberSyncConfig & { apiUrl: string; apiKey: string } =>
+  Boolean(config.apiUrl && config.apiKey);
+
+export const isRoleOutboundSyncEnabled = (
+  config: Pick<AMemberSyncConfig, 'roleSyncMode'>
+): boolean => config.roleSyncMode === 'two_way';
 
 export const toAMemberSyncRuntimeConfig = (
   tenantId: string,
@@ -85,36 +141,27 @@ export const toAMemberSyncRuntimeConfig = (
     return;
   }
 
-  const base = {
-    enabled: true as const,
+  const inboundMode = resolveInboundMode(stored);
+
+  const parsed = amemberSyncConfigGuard.safeParse({
+    enabled: true,
+    outboundEnabled: stored.outboundEnabled,
+    roleSyncMode: stored.roleSyncMode,
     tenantId,
     intervalSeconds: stored.intervalSeconds,
     syncPasswords: stored.syncPasswords,
-  };
+    inboundMode,
+    tablePrefix: stored.tablePrefix,
+    apiUrl: stored.apiUrl,
+    apiKey: stored.apiKey,
+    databaseUrl: stored.databaseUrl,
+  });
 
-  if (stored.mode === 'database') {
-    if (!stored.databaseUrl) {
-      return;
-    }
-
-    return {
-      ...base,
-      mode: 'database',
-      databaseUrl: stored.databaseUrl,
-      tablePrefix: stored.tablePrefix,
-    };
-  }
-
-  if (!stored.apiUrl || !stored.apiKey) {
+  if (!parsed.success) {
     return;
   }
 
-  return {
-    ...base,
-    mode: 'api',
-    apiUrl: stored.apiUrl,
-    apiKey: stored.apiKey,
-  };
+  return parsed.data;
 };
 
 export type AMemberSyncStats = {

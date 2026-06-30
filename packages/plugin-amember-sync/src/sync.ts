@@ -1,4 +1,4 @@
-import { parseAMemberProductIdFromRoleName } from './constants.js';
+import { buildProductRoleName, parseProductIdFromRoleName } from './constants.js';
 import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
 import type { AMemberSyncConfig, AMemberSyncLogger, AMemberSyncStats, AMemberUser } from './types.js';
 import { createAMemberDataSource } from './sources/index.js';
@@ -82,7 +82,7 @@ export const runAMemberSync = async ({
   const roleByProductId = new Map<number, (typeof existingRoles)[number]>();
 
   for (const role of existingRoles) {
-    const productId = parseAMemberProductIdFromRoleName(role.name);
+    const productId = parseProductIdFromRoleName(role.name);
 
     if (productId !== undefined) {
       roleByProductId.set(productId, role);
@@ -92,17 +92,23 @@ export const runAMemberSync = async ({
   logger.info(`Syncing ${products.length} aMember products to roles...`);
   for (const product of products) {
     const description = truncateRoleDescription(product.description ?? product.title);
+    const expectedName = buildProductRoleName(product.productId, product.title);
     const existingRole = roleByProductId.get(product.productId);
 
     if (!existingRole) {
-      const role = await context.createAMemberRole(product.productId, description);
+      const role = await context.createAMemberRole(product.productId, product.title, description);
       roleByProductId.set(product.productId, role);
       stats.productsCreated += 1;
       continue;
     }
 
-    if (existingRole.description !== description) {
-      await context.updateAMemberRole(existingRole.id, description);
+    if (existingRole.name !== expectedName || existingRole.description !== description) {
+      await context.updateAMemberRole(
+        existingRole.id,
+        product.productId,
+        product.title,
+        description
+      );
       stats.productsUpdated += 1;
     }
   }

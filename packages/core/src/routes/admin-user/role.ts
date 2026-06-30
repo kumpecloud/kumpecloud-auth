@@ -4,6 +4,7 @@ import { tryThat } from '@silverhand/essentials';
 import { array, object, string } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
+import { pushUserRoleChangesToAMember } from '#src/libraries/amember-sync/outbound.js';
 import koaGuard from '#src/middleware/koa-guard.js';
 import koaPagination from '#src/middleware/koa-pagination.js';
 import koaRoleRlsErrorHandler from '#src/middleware/koa-role-rls-error-handler.js';
@@ -13,7 +14,7 @@ import { parseSearchParamsForSearch } from '#src/utils/search.js';
 import type { ManagementApiRouter, RouterInitArgs } from '../types.js';
 
 export default function adminUserRoleRoutes<T extends ManagementApiRouter>(
-  ...[router, { queries }]: RouterInitArgs<T>
+  ...[router, { queries, id: tenantId }]: RouterInitArgs<T>
 ) {
   const {
     roles: { findRoleById, countRoles, findRoles, findRolesByRoleIds },
@@ -102,6 +103,9 @@ export default function adminUserRoleRoutes<T extends ManagementApiRouter>(
         await insertUsersRoles(
           roleIdsToAdd.map((roleId) => ({ id: generateStandardId(), userId, roleId }))
         );
+        pushUserRoleChangesToAMember(tenantId, userId, {
+          grantedRoleNames: roles.map((role) => role.name),
+        });
       }
 
       ctx.body = { roleIds, addedRoleIds: roleIdsToAdd };
@@ -138,12 +142,20 @@ export default function adminUserRoleRoutes<T extends ManagementApiRouter>(
         .map(({ roleId }) => roleId);
 
       await Promise.all(roleIdsToAdd.map(async (roleId) => findRoleById(roleId)));
+      const rolesToAdd = await findRolesByRoleIds(roleIdsToAdd);
+      const rolesToRemove = await findRolesByRoleIds(roleIdsToRemove);
+
       await Promise.all(
         roleIdsToRemove.map(async (roleId) => deleteUsersRolesByUserIdAndRoleId(userId, roleId))
       );
       await insertUsersRoles(
         roleIdsToAdd.map((roleId) => ({ id: generateStandardId(), userId, roleId }))
       );
+
+      pushUserRoleChangesToAMember(tenantId, userId, {
+        grantedRoleNames: rolesToAdd.map((role) => role.name),
+        revokedRoleNames: rolesToRemove.map((role) => role.name),
+      });
 
       ctx.body = { roleIds: [...new Set(roleIds)] };
       ctx.status = 200;
@@ -163,7 +175,12 @@ export default function adminUserRoleRoutes<T extends ManagementApiRouter>(
         params: { userId, roleId },
       } = ctx.guard;
 
+      const role = await findRoleById(roleId);
       await deleteUsersRolesByUserIdAndRoleId(userId, roleId);
+
+      pushUserRoleChangesToAMember(tenantId, userId, {
+        revokedRoleNames: [role.name],
+      });
 
       ctx.status = 204;
 
