@@ -65,6 +65,13 @@ const user = {
   identity_not_exists_in_current_user:
     'Указанная учетная запись не существует в текущей учетной записи пользователя. Пожалуйста, свяжите учетную запись перед продолжением.',
   passkey_preferred: 'Создайте passkey, чтобы упростить процесс входа.',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);

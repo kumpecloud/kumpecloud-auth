@@ -49,6 +49,10 @@ export {
 } from './outbound.js';
 export { runAMemberSync } from './sync.js';
 export {
+  applyAMemberOutboundSignUpRequirements,
+  getAMemberOutboundMandatoryProfiles,
+} from './sign-up-requirements.js';
+export {
   buildAMemberPhoneUpdate,
   buildAMemberSuspensionUpdate,
   buildAMemberUserName,

@@ -58,6 +58,13 @@ const user = {
   identity_not_exists_in_current_user:
     'الهوية المحددة غير موجودة في حساب المستخدم الحالي. من فضلك قم بربط الهوية قبل المتابعة.',
   passkey_preferred: 'أنشئ مفتاح مرور لتبسيط عملية تسجيل الدخول الخاصة بك.',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);

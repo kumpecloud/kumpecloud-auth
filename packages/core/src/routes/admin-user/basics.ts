@@ -14,9 +14,10 @@ import { boolean, literal, nativeEnum, object, string } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
 import {
-  pushCreatedUserToAMember,
+  provisionCreatedUserToAMember,
   pushUpdatedUserToAMember,
   pushUserPasswordToAMember,
+  validateAMemberOutboundUserCreateInput,
 } from '#src/libraries/amember-sync/outbound.js';
 import { buildManagementApiContext } from '#src/libraries/hook/utils.js';
 import {
@@ -240,7 +241,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         profile: userProfileGuard,
       }).partial(),
       response: adminUserProfileResponseGuard,
-      status: [200, 400, 404, 422],
+      status: [200, 400, 404, 422, 502],
     }),
     // eslint-disable-next-line complexity
     async (ctx, next) => {
@@ -284,6 +285,13 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         parseLegacyPassword(passwordDigest);
       }
 
+      await validateAMemberOutboundUserCreateInput(tenantId, {
+        username,
+        primaryEmail,
+        password,
+        passwordEncrypted: passwordDigest,
+      });
+
       const id = await generateUserId();
       const passwordPayload = password
         ? buildUserPasswordPayload(await encryptUserPassword(password))
@@ -306,7 +314,12 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         ...conditional(profile && { profile }),
       });
 
-      pushCreatedUserToAMember(tenantId, user, password);
+      try {
+        await provisionCreatedUserToAMember(tenantId, user, password);
+      } catch (error: unknown) {
+        await deleteUserById(user.id);
+        throw error;
+      }
 
       ctx.body = transpileAdminUserProfileResponse(user, {}, { gravatarEnabled: ctx.gravatarEnabled });
       return next();

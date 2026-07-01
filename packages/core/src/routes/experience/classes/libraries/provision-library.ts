@@ -20,7 +20,7 @@ import { generateStandardId } from '@logto/shared';
 import { condArray, conditional, conditionalArray, trySafe } from '@silverhand/essentials';
 
 import { EnvSet } from '#src/env-set/index.js';
-import { pushCreatedUserToAMember } from '#src/libraries/amember-sync/outbound.js';
+import { provisionCreatedUserToAMember, validateAMemberOutboundUserCreateInput } from '#src/libraries/amember-sync/outbound.js';
 import { truncateMembershipDelta } from '#src/libraries/hook/utils.js';
 import { buildUserPasswordPayload } from '#src/libraries/user.utils.js';
 import type TenantContext from '#src/tenants/TenantContext.js';
@@ -59,7 +59,7 @@ export class ProvisionLibrary {
   async createUser(profile: InteractionProfile, plainPassword?: string) {
     const {
       libraries: {
-        users: { generateUserId, insertUser },
+        users: { generateUserId, insertUser, deleteUserById },
         socials: { upsertSocialTokenSetSecret },
         ssoConnectors: { upsertEnterpriseSsoTokenSetSecret },
       },
@@ -79,6 +79,13 @@ export class ProvisionLibrary {
 
     const { isCreatingFirstAdminUser, initialUserRoles, customData } =
       await this.getUserProvisionContext(profile);
+
+    await validateAMemberOutboundUserCreateInput(this.tenantContext.id, {
+      username: rest.username,
+      primaryEmail: rest.primaryEmail,
+      passwordEncrypted,
+      plainPassword,
+    });
 
     const [user] = await insertUser(
       {
@@ -100,6 +107,13 @@ export class ProvisionLibrary {
       },
       { roleNames: initialUserRoles, isInteractive: true }
     );
+
+    try {
+      await provisionCreatedUserToAMember(this.tenantContext.id, user, plainPassword);
+    } catch (error: unknown) {
+      await deleteUserById(user.id);
+      throw error;
+    }
 
     if (enterpriseSsoIdentity) {
       await this.addSsoIdentityToUser(user.id, enterpriseSsoIdentity);
@@ -132,8 +146,6 @@ export class ProvisionLibrary {
     this.ctx.appendDataHookContext('User.Created', { user });
 
     this.triggerAnalyticReports(user);
-
-    pushCreatedUserToAMember(this.tenantContext.id, user, plainPassword);
 
     return user;
   }

@@ -67,6 +67,13 @@ const user = {
   identity_not_exists_in_current_user:
     'Die angegebene Identität existiert nicht im aktuellen Benutzerkonto. Bitte verknüpfen Sie die Identität, bevor Sie fortfahren.',
   passkey_preferred: 'Erstelle einen Passkey, um deinen Anmeldevorgang zu vereinfachen.',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);

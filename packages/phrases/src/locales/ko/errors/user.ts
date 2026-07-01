@@ -59,6 +59,13 @@ const user = {
   identity_not_exists_in_current_user:
     '지정된 아이덴티티는 현재 사용자 계정에 존재하지 않습니다. 진행하기 전에 아이덴티티를 연동해주세요.',
   passkey_preferred: '패스키를 만들어 로그인 과정을 더 간단하게 하세요.',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);

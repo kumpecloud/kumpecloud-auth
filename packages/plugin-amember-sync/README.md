@@ -81,6 +81,10 @@ Console-stored configuration takes precedence over environment variables when en
 
 **Outbound** (Auth → aMember) only requires the outbound toggle plus API URL and key. Inbound sync does not need to be enabled, and MySQL credentials are not required for outbound-only setups.
 
+When outbound sync is configured, **Logto user creation fails** if the matching aMember user cannot be created (the Logto user is rolled back). Profile, password, and role updates remain best-effort async pushes.
+
+User creation requires **email**, **username**, and **password** when outbound sync is enabled, because aMember requires them.
+
 **Inbound** scheduled sync requires the main sync toggle and valid inbound credentials (MySQL or API, depending on mode).
 
 ## Running inbound sync

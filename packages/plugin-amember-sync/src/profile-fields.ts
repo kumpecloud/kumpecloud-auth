@@ -445,15 +445,16 @@ export const buildLogtoUserToAMemberFields = (
     throw new Error('Cannot push user to aMember without login, username, or email');
   }
 
-  const fields: Record<string, string> = {
-    login,
-  };
-
   const email = user.primaryEmail?.trim();
 
-  if (email) {
-    fields.email = email;
+  if (!email) {
+    throw new Error('Cannot push user to aMember without email');
   }
+
+  const fields: Record<string, string> = {
+    login,
+    email,
+  };
 
   if (plainPassword) {
     fields.pass = plainPassword;

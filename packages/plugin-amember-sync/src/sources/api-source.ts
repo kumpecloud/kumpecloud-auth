@@ -1,11 +1,10 @@
-import got from 'got';
-
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
 import { parseAMemberUserProfileFields } from '../profile-fields.js';
 import { buildAMemberUserName, isTruthyFlag } from '../utils.js';
 
 import { readAMemberJsonResponse } from '../sinks/api-response.js';
+import { createAMemberApiClient } from '../sinks/amember-api-client.js';
 
 type ApiListResponse<T> = {
   _total?: number;
@@ -159,12 +158,7 @@ export const createApiAMemberDataSource = ({
   apiUrl: string;
   apiKey: string;
 }): AMemberDataSource => {
-  const client = got.extend({
-    prefixUrl: apiUrl.replace(/\/$/u, ''),
-    searchParams: { _key: apiKey },
-    responseType: 'json',
-    retry: { limit: 2 },
-  });
+  const client = createAMemberApiClient(apiUrl, apiKey);
 
   const fetchAllPages = async <T>(endpoint: string): Promise<T[]> => {
     const items: T[] = [];

@@ -62,6 +62,13 @@ const user = {
   identity_not_exists_in_current_user:
     '指定されたアイデンティティは現在のユーザーアカウントに存在しません。続行する前にアイデンティティをリンクしてください。',
   passkey_preferred: 'パスキーを作成してサインインを簡単にしましょう。',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);
