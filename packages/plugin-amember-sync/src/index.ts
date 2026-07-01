@@ -9,7 +9,12 @@ export {
   parseProductIdFromRoleName,
 } from './constants.js';
 export type { AMemberSyncContext, AMemberDataSource, LogtoUserRecord } from './context.js';
-export { loadAMemberSyncConfigFromEnv, resolveAMemberSyncConfig } from './config.js';
+export {
+  loadAMemberOutboundConfigFromEnv,
+  loadAMemberSyncConfigFromEnv,
+  resolveAMemberOutboundConfig,
+  resolveAMemberSyncConfig,
+} from './config.js';
 export {
   buildDatabaseUrl,
   defaultDatabasePort,
@@ -63,6 +68,7 @@ export {
 } from './utils.js';
 export type {
   AMemberAccess,
+  AMemberOutboundConfig,
   AMemberProduct,
   AMemberRoleSyncMode,
   AMemberSyncConfig,
@@ -72,10 +78,12 @@ export type {
   AMemberUser,
 } from './types.js';
 export {
+  amemberOutboundConfigGuard,
   amemberSyncConfigGuard,
   hasOutboundApiCredentials,
   isRoleOutboundSyncEnabled,
   resolveInboundMode,
+  toAMemberOutboundRuntimeConfig,
   toAMemberSyncRuntimeConfig,
 } from './types.js';
 export { createSlonikAMemberSyncContext } from './slonik-context.js';

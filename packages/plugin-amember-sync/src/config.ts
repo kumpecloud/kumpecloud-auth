@@ -2,9 +2,12 @@ import { defaultTenantId, type AMemberSyncStoredConfig } from '@logto/schemas';
 import { getEnv, yes } from '@silverhand/essentials';
 
 import {
+  amemberOutboundConfigGuard,
   amemberSyncConfigGuard,
   resolveInboundMode,
+  toAMemberOutboundRuntimeConfig,
   toAMemberSyncRuntimeConfig,
+  type AMemberOutboundConfig,
   type AMemberSyncConfig,
 } from './types.js';
 import { defaultDatabasePort, resolveDatabaseUrl } from './database-connection.js';
@@ -71,6 +74,58 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
   }
 
   return parsed.data;
+};
+
+/**
+ * Load outbound-only aMember API credentials from environment variables.
+ * Does not require inbound sync (`AMEMBER_SYNC_ENABLED`) to be set.
+ */
+export const loadAMemberOutboundConfigFromEnv = (): AMemberOutboundConfig | undefined => {
+  if (yes(getEnv('AMEMBER_SYNC_OUTBOUND_DISABLED'))) {
+    return;
+  }
+
+  const apiUrl = getEnv('AMEMBER_API_URL');
+  const apiKey = getEnv('AMEMBER_API_KEY');
+
+  if (!apiUrl || !apiKey) {
+    return;
+  }
+
+  const roleSyncModeEnv = getEnv('AMEMBER_SYNC_ROLE_SYNC_MODE', 'one_way');
+  const tenantId = getEnv('AMEMBER_SYNC_TENANT_ID', defaultTenantId);
+
+  const parsed = amemberOutboundConfigGuard.safeParse({
+    tenantId,
+    roleSyncMode: roleSyncModeEnv === 'two_way' ? ('two_way' as const) : ('one_way' as const),
+    apiUrl,
+    apiKey,
+  });
+
+  if (!parsed.success) {
+    return;
+  }
+
+  return parsed.data;
+};
+
+export const resolveAMemberOutboundConfig = (
+  tenantId: string,
+  stored?: AMemberSyncStoredConfig
+): AMemberOutboundConfig | undefined => {
+  const fromStored = stored ? toAMemberOutboundRuntimeConfig(tenantId, stored) : undefined;
+
+  if (fromStored) {
+    return fromStored;
+  }
+
+  const fromEnv = loadAMemberOutboundConfigFromEnv();
+
+  if (fromEnv && fromEnv.tenantId === tenantId) {
+    return fromEnv;
+  }
+
+  return;
 };
 
 export const resolveAMemberSyncConfig = (
