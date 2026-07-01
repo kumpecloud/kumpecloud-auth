@@ -1,22 +1,28 @@
-import type { MissingProfile, SignUp, SignUpIdentifier } from '@logto/schemas';
+import {
+  AlternativeSignUpIdentifier,
+  MissingProfile,
+  SignInIdentifier,
+  type SignUp,
+  type SignUpIdentifier,
+} from '@logto/schemas';
 
 const signInIdentifier = {
-  username: 'username',
-  email: 'email',
+  username: SignInIdentifier.Username,
+  email: SignInIdentifier.Email,
 } as const;
 
 const alternativeSignUpIdentifier = {
-  emailOrPhone: 'emailOrPhone',
+  emailOrPhone: AlternativeSignUpIdentifier.EmailOrPhone,
 } as const;
 
 const missingProfile = {
-  email: 'email',
-  username: 'username',
-  password: 'password',
-} as const satisfies Record<string, MissingProfile>;
+  email: MissingProfile.email,
+  username: MissingProfile.username,
+  password: MissingProfile.password,
+} as const;
 
-const hasPrimaryIdentifier = (signUp: SignUp, identifier: SignUpIdentifier) =>
-  signUp.identifiers.includes(identifier as SignUp['identifiers'][number]);
+const hasPrimaryIdentifier = (signUp: SignUp, identifier: SignInIdentifier) =>
+  signUp.identifiers.includes(identifier);
 
 const hasSecondaryIdentifier = (signUp: SignUp, identifier: SignUpIdentifier) =>
   signUp.secondaryIdentifiers?.some((entry) => entry.identifier === identifier) ?? false;
@@ -38,7 +44,7 @@ export const applyAMemberOutboundSignUpRequirements = (signUp: SignUp): SignUp =
     (entry) => entry.identifier !== alternativeSignUpIdentifier.emailOrPhone
   );
 
-  const addSecondaryIdentifier = (identifier: SignUpIdentifier) => {
+  const addSecondaryIdentifier = (identifier: SignInIdentifier) => {
     if (
       hasPrimaryIdentifier(signUp, identifier) ||
       secondaryIdentifiers.some((entry) => entry.identifier === identifier)
