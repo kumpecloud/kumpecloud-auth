@@ -7,11 +7,18 @@ import {
   toAMemberSyncRuntimeConfig,
   type AMemberSyncConfig,
 } from './types.js';
+import { defaultDatabasePort, resolveDatabaseUrl } from './database-connection.js';
 
 const parseIntervalSeconds = (value?: string) => {
   const parsed = Number(value ?? '3600');
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600;
+};
+
+const parseDatabasePort = (value?: string) => {
+  const parsed = Number(value ?? defaultDatabasePort);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultDatabasePort;
 };
 
 /**
@@ -29,6 +36,17 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
   const intervalSeconds = parseIntervalSeconds(getEnv('AMEMBER_SYNC_INTERVAL_SECONDS'));
   const syncPasswords = !yes(getEnv('AMEMBER_SYNC_SKIP_PASSWORDS'));
   const roleSyncModeEnv = getEnv('AMEMBER_SYNC_ROLE_SYNC_MODE', 'one_way');
+  const databaseUrl = resolveDatabaseUrl({
+    enabled: false,
+    databaseHost: getEnv('AMEMBER_DATABASE_HOST') || undefined,
+    databasePort: getEnv('AMEMBER_DATABASE_PORT')
+      ? parseDatabasePort(getEnv('AMEMBER_DATABASE_PORT'))
+      : undefined,
+    databaseUser: getEnv('AMEMBER_DATABASE_USER') || undefined,
+    databasePassword: getEnv('AMEMBER_DATABASE_PASSWORD') || undefined,
+    databaseName: getEnv('AMEMBER_DATABASE_NAME') || undefined,
+    databaseUrl: getEnv('AMEMBER_DATABASE_URL') || undefined,
+  });
 
   const config = {
     enabled: true as const,
@@ -42,7 +60,7 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
     syncPasswords,
     inboundMode,
     tablePrefix: getEnv('AMEMBER_TABLE_PREFIX', 'am_'),
-    databaseUrl: getEnv('AMEMBER_DATABASE_URL') || undefined,
+    databaseUrl,
     apiUrl: getEnv('AMEMBER_API_URL') || undefined,
     apiKey: getEnv('AMEMBER_API_KEY') || undefined,
   };

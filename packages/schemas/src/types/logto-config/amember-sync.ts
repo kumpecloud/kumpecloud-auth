@@ -21,7 +21,13 @@ export const amemberSyncStoredConfigGuard = z.object({
   tablePrefix: z.string().default('am_'),
   apiUrl: z.string().optional(),
   apiKey: z.string().optional(),
+  /** @deprecated Prefer discrete database connection fields. Kept for legacy stored configs. */
   databaseUrl: z.string().optional(),
+  databaseHost: z.string().optional(),
+  databasePort: z.number().int().positive().optional(),
+  databaseUser: z.string().optional(),
+  databasePassword: z.string().optional(),
+  databaseName: z.string().optional(),
 });
 
 export type AMemberSyncStoredConfig = z.infer<typeof amemberSyncStoredConfigGuard>;
@@ -31,10 +37,15 @@ export const amemberSyncConfigPatchGuard = amemberSyncStoredConfigGuard.partial(
 export type AMemberSyncConfigPatch = z.infer<typeof amemberSyncConfigPatchGuard>;
 
 export const amemberSyncConfigResponseGuard = amemberSyncStoredConfigGuard
-  .omit({ apiKey: true, databaseUrl: true, mode: true })
+  .omit({
+    apiKey: true,
+    databaseUrl: true,
+    databasePassword: true,
+    mode: true,
+  })
   .extend({
     apiKeySet: z.boolean(),
-    databaseUrlSet: z.boolean(),
+    databasePasswordSet: z.boolean(),
   });
 
 export type AMemberSyncConfigResponse = z.infer<typeof amemberSyncConfigResponseGuard>;

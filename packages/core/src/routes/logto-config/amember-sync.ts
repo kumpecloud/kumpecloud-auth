@@ -6,7 +6,11 @@ import {
   type AMemberSyncConfigResponse,
   type AMemberSyncStoredConfig,
 } from '@logto/schemas';
-import { resolveInboundMode } from '@logto/plugin-amember-sync';
+import {
+  normalizeStoredDatabaseConfig,
+  resolveInboundMode,
+  toDatabaseConnectionResponse,
+} from '@logto/plugin-amember-sync';
 
 import koaGuard from '#src/middleware/koa-guard.js';
 
@@ -15,13 +19,15 @@ import type { ManagementApiRouter, RouterInitArgs } from '../types.js';
 import { runTenantAMemberSync } from '../../libraries/amember-sync/index.js';
 
 const toResponse = (config: AMemberSyncStoredConfig): AMemberSyncConfigResponse => {
-  const { mode: _deprecatedMode, ...rest } = config;
+  const normalized = normalizeStoredDatabaseConfig(config);
+  const { mode: _deprecatedMode, databaseUrl: _legacyUrl, databasePassword: _password, ...rest } =
+    normalized;
 
   return amemberSyncConfigResponseGuard.parse({
     ...rest,
     inboundMode: resolveInboundMode(config),
     apiKeySet: Boolean(config.apiKey),
-    databaseUrlSet: Boolean(config.databaseUrl),
+    ...toDatabaseConnectionResponse(normalized),
   });
 };
 
@@ -44,11 +50,19 @@ const mergeAMemberSyncConfig = (
     merged.apiKey = existing.apiKey;
   }
 
-  if (!patch.databaseUrl?.trim()) {
-    merged.databaseUrl = existing.databaseUrl;
+  if (!patch.databasePassword?.trim()) {
+    merged.databasePassword = existing.databasePassword;
   }
 
-  return amemberSyncStoredConfigGuard.parse(merged);
+  const normalized = normalizeStoredDatabaseConfig(merged);
+
+  if (normalized.databaseHost && normalized.databaseUser && normalized.databasePassword && normalized.databaseName) {
+    const { databaseUrl: _legacyUrl, ...withoutLegacyUrl } = normalized;
+
+    return amemberSyncStoredConfigGuard.parse(withoutLegacyUrl);
+  }
+
+  return amemberSyncStoredConfigGuard.parse(normalized);
 };
 
 export default function amemberSyncRoutes<T extends ManagementApiRouter>(

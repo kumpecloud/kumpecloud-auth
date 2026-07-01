@@ -11,6 +11,16 @@ export {
 export type { AMemberSyncContext, AMemberDataSource, LogtoUserRecord } from './context.js';
 export { loadAMemberSyncConfigFromEnv, resolveAMemberSyncConfig } from './config.js';
 export {
+  buildDatabaseUrl,
+  defaultDatabasePort,
+  hasDatabaseConnection,
+  normalizeStoredDatabaseConfig,
+  resolveDatabaseConnectionFields,
+  resolveDatabaseUrl,
+  toDatabaseConnectionResponse,
+} from './database-connection.js';
+export type { AMemberDatabaseConnectionFields, AMemberDatabaseConnectionResponse } from './database-connection.js';
+export {
   aMemberProfileFieldDescriptors,
   buildAMemberCustomData,
   buildAMemberSyncedCustomDataFields,

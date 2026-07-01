@@ -49,7 +49,7 @@ When **outbound sync** is enabled:
 Open **Settings → aMember sync**:
 
 1. **General** — enable inbound sync, interval, password hash import, product role sync direction
-2. **Inbound** — choose MySQL (recommended) or API; provide database URL when using MySQL
+2. **Inbound** — choose MySQL (recommended) or API; provide database host, port, username, password, and database name when using MySQL
 3. **Outbound** — enable push to aMember; provide API URL and key (also used for inbound when inbound mode is API)
 
 ### Environment variables (optional fallback)
@@ -64,7 +64,12 @@ AMEMBER_SYNC_SKIP_PASSWORDS=true        # optional
 
 # Inbound (default: database)
 AMEMBER_SYNC_INBOUND_MODE=database      # or AMEMBER_SYNC_MODE=database
-AMEMBER_DATABASE_URL=mysql://user:pass@host:3306/amember
+AMEMBER_DATABASE_HOST=db.example.com
+AMEMBER_DATABASE_PORT=3306
+AMEMBER_DATABASE_USER=amember
+AMEMBER_DATABASE_PASSWORD=secret
+AMEMBER_DATABASE_NAME=amember
+# AMEMBER_DATABASE_URL=mysql://user:pass@host:3306/amember   # legacy alternative
 AMEMBER_TABLE_PREFIX=am_
 
 # Outbound (and inbound when inbound mode is api)
