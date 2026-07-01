@@ -2,8 +2,7 @@ import {
   pushLogtoPasswordToAMember,
   pushLogtoRoleGrantsToAMember,
   pushLogtoUserToAMember,
-  resolveAMemberSyncConfig,
-  hasOutboundApiCredentials,
+  resolveAMemberOutboundConfig,
   type AMemberOutboundPushUser,
   type AMemberSyncLogger,
 } from '@logto/plugin-amember-sync';
@@ -42,9 +41,12 @@ const getOutboundConfig = async (tenantId: string) => {
   const stored =
     (await tenant.queries.logtoConfigs.getAMemberSyncConfig()) ??
     amemberSyncStoredConfigGuard.parse({ enabled: false });
-  const config = resolveAMemberSyncConfig(tenantId, stored);
+  const config = resolveAMemberOutboundConfig(tenantId, stored);
 
-  if (!config?.enabled || !config.outboundEnabled || !hasOutboundApiCredentials(config)) {
+  if (!config) {
+    logger.warn(
+      `Skipping aMember outbound push for tenant "${tenantId}": enable outbound sync and save a valid API URL and key`
+    );
     return;
   }
 

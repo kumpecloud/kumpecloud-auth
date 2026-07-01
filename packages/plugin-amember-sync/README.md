@@ -79,6 +79,10 @@ AMEMBER_API_KEY=your-rest-api-key
 
 Console-stored configuration takes precedence over environment variables when enabled.
 
+**Outbound** (Auth → aMember) only requires the outbound toggle plus API URL and key. Inbound sync does not need to be enabled, and MySQL credentials are not required for outbound-only setups.
+
+**Inbound** scheduled sync requires the main sync toggle and valid inbound credentials (MySQL or API, depending on mode).
+
 ## Running inbound sync
 
 **Automatic (core):** When enabled, core runs inbound sync on startup and on the configured interval. Outbound sync runs inline on user lifecycle events.

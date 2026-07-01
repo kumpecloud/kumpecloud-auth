@@ -5,6 +5,8 @@ import type { AMemberDataSource } from '../context.js';
 import { parseAMemberUserProfileFields } from '../profile-fields.js';
 import { buildAMemberUserName, isTruthyFlag } from '../utils.js';
 
+import { readAMemberJsonResponse } from '../sinks/api-response.js';
+
 type ApiListResponse<T> = {
   _total?: number;
   _page?: number;
@@ -170,12 +172,16 @@ export const createApiAMemberDataSource = ({
     let total = Number.POSITIVE_INFINITY;
 
     while (page * pageSize < total) {
-      const body = await client.get(endpoint, {
-        searchParams: {
-          count: pageSize,
-          page,
-        },
-      }).json<unknown>();
+      const body = await readAMemberJsonResponse(`list ${endpoint}`, () =>
+        client
+          .get(endpoint, {
+            searchParams: {
+              count: pageSize,
+              page,
+            },
+          })
+          .json<unknown>()
+      );
 
       const pageItems = extractItems<T>(body);
       items.push(...pageItems);

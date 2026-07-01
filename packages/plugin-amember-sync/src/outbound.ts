@@ -8,7 +8,7 @@ import {
   type LogtoUserForAMemberOutbound,
 } from './profile-fields.js';
 import { createApiAMemberDataSink, type AMemberDataSink } from './sinks/api-sink.js';
-import { hasOutboundApiCredentials, isRoleOutboundSyncEnabled, type AMemberSyncConfig, type AMemberSyncLogger } from './types.js';
+import { isRoleOutboundSyncEnabled, type AMemberOutboundConfig, type AMemberSyncLogger } from './types.js';
 import { getAMemberUserIdFromCustomData } from './utils.js';
 
 export type AMemberOutboundPushUser = LogtoUserForAMemberOutbound & {
@@ -20,11 +20,7 @@ export type AMemberOutboundContext = {
   updateUserCustomData: (userId: string, customData: Record<string, unknown>) => Promise<void>;
 };
 
-const createSink = (config: AMemberSyncConfig): AMemberDataSink => {
-  if (!hasOutboundApiCredentials(config)) {
-    throw new Error('aMember outbound sync requires apiUrl and apiKey');
-  }
-
+const createSink = (config: AMemberOutboundConfig): AMemberDataSink => {
   return createApiAMemberDataSink({
     apiUrl: config.apiUrl,
     apiKey: config.apiKey,
@@ -67,16 +63,12 @@ export const pushLogtoUserToAMember = async ({
   user,
   plainPassword,
 }: {
-  config: AMemberSyncConfig;
+  config: AMemberOutboundConfig;
   context: AMemberOutboundContext;
   logger: AMemberSyncLogger;
   user: AMemberOutboundPushUser;
   plainPassword?: string;
 }): Promise<void> => {
-  if (!config.enabled || !config.outboundEnabled || !hasOutboundApiCredentials(config)) {
-    return;
-  }
-
   const sink = createSink(config);
   const amemberUserId = await resolveAMemberUserId({
     user,
@@ -107,16 +99,12 @@ export const pushLogtoPasswordToAMember = async ({
   user,
   plainPassword,
 }: {
-  config: AMemberSyncConfig;
+  config: AMemberOutboundConfig;
   context: AMemberOutboundContext;
   logger: AMemberSyncLogger;
   user: AMemberOutboundPushUser;
   plainPassword: string;
 }): Promise<void> => {
-  if (!config.enabled || !config.outboundEnabled || !hasOutboundApiCredentials(config)) {
-    return;
-  }
-
   const sink = createSink(config);
   const amemberUserId = await resolveAMemberUserId({
     user,
@@ -144,19 +132,14 @@ export const pushLogtoRoleGrantsToAMember = async ({
   roleNames,
   revokedRoleNames = [],
 }: {
-  config: AMemberSyncConfig;
+  config: AMemberOutboundConfig;
   context: AMemberOutboundContext;
   logger: AMemberSyncLogger;
   user: AMemberOutboundPushUser;
   roleNames: string[];
   revokedRoleNames?: string[];
 }): Promise<void> => {
-  if (
-    !config.enabled ||
-    !config.outboundEnabled ||
-    !isRoleOutboundSyncEnabled(config) ||
-    !hasOutboundApiCredentials(config)
-  ) {
+  if (!isRoleOutboundSyncEnabled(config)) {
     return;
   }
 

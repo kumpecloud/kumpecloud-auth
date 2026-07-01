@@ -122,18 +122,48 @@ export const amemberSyncConfigGuard = z
 
 export type AMemberSyncConfig = z.infer<typeof amemberSyncConfigGuard>;
 
+export const amemberOutboundConfigGuard = z.object({
+  tenantId: z.string().min(1),
+  roleSyncMode: amemberRoleSyncModeGuard.default('one_way'),
+  apiUrl: z.string().url(),
+  apiKey: z.string().min(1),
+});
+
+export type AMemberOutboundConfig = z.infer<typeof amemberOutboundConfigGuard>;
+
 export const resolveInboundMode = (
   stored: Pick<AMemberSyncStoredConfig, 'inboundMode' | 'mode'>
 ): AMemberSyncMode => stored.inboundMode ?? stored.mode ?? 'database';
 
-export const hasOutboundApiCredentials = (
-  config: Pick<AMemberSyncConfig, 'apiUrl' | 'apiKey'>
-): config is AMemberSyncConfig & { apiUrl: string; apiKey: string } =>
-  Boolean(config.apiUrl && config.apiKey);
+export const hasOutboundApiCredentials = <T extends { apiUrl?: string; apiKey?: string }>(
+  config: T
+): config is T & { apiUrl: string; apiKey: string } => Boolean(config.apiUrl && config.apiKey);
 
 export const isRoleOutboundSyncEnabled = (
-  config: Pick<AMemberSyncConfig, 'roleSyncMode'>
+  config: Pick<AMemberOutboundConfig, 'roleSyncMode'>
 ): boolean => config.roleSyncMode === 'two_way';
+
+export const toAMemberOutboundRuntimeConfig = (
+  tenantId: string,
+  stored: AMemberSyncStoredConfig
+): AMemberOutboundConfig | undefined => {
+  if (!stored.outboundEnabled) {
+    return;
+  }
+
+  const parsed = amemberOutboundConfigGuard.safeParse({
+    tenantId,
+    roleSyncMode: stored.roleSyncMode ?? 'one_way',
+    apiUrl: stored.apiUrl,
+    apiKey: stored.apiKey,
+  });
+
+  if (!parsed.success) {
+    return;
+  }
+
+  return parsed.data;
+};
 
 export const toAMemberSyncRuntimeConfig = (
   tenantId: string,
