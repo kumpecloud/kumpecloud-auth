@@ -29,8 +29,14 @@ type FormData = {
   tablePrefix: string;
   apiUrl: string;
   apiKey: string;
-  databaseUrl: string;
+  databaseHost: string;
+  databasePort: number;
+  databaseUser: string;
+  databasePassword: string;
+  databaseName: string;
 };
+
+const defaultDatabasePort = 3306;
 
 const defaultFormData: FormData = {
   enabled: false,
@@ -42,7 +48,11 @@ const defaultFormData: FormData = {
   tablePrefix: 'am_',
   apiUrl: '',
   apiKey: '',
-  databaseUrl: '',
+  databaseHost: '',
+  databasePort: defaultDatabasePort,
+  databaseUser: '',
+  databasePassword: '',
+  databaseName: '',
 };
 
 const toFormData = (data?: AMemberSyncConfigResponse): FormData => ({
@@ -55,6 +65,10 @@ const toFormData = (data?: AMemberSyncConfigResponse): FormData => ({
   syncPasswords: data?.syncPasswords ?? defaultFormData.syncPasswords,
   tablePrefix: data?.tablePrefix ?? defaultFormData.tablePrefix,
   apiUrl: data?.apiUrl ?? defaultFormData.apiUrl,
+  databaseHost: data?.databaseHost ?? defaultFormData.databaseHost,
+  databasePort: data?.databasePort ?? defaultFormData.databasePort,
+  databaseUser: data?.databaseUser ?? defaultFormData.databaseUser,
+  databaseName: data?.databaseName ?? defaultFormData.databaseName,
 });
 
 function AMemberSyncSettings() {
@@ -71,13 +85,26 @@ function AMemberSyncSettings() {
     handleSubmit,
     formState: { isDirty, isSubmitting },
   } = methods;
-  const [enabled, inboundMode, outboundEnabled, apiUrl, apiKey, databaseUrl] = watch([
+  const [
+    enabled,
+    inboundMode,
+    outboundEnabled,
+    apiUrl,
+    apiKey,
+    databaseHost,
+    databaseUser,
+    databasePassword,
+    databaseName,
+  ] = watch([
     'enabled',
     'inboundMode',
     'outboundEnabled',
     'apiUrl',
     'apiKey',
-    'databaseUrl',
+    'databaseHost',
+    'databaseUser',
+    'databasePassword',
+    'databaseName',
   ]);
   const isDatabaseInbound = inboundMode === 'database';
   const needsApiCredentials = outboundEnabled || inboundMode === 'api';
@@ -98,7 +125,12 @@ function AMemberSyncSettings() {
     [t]
   );
 
-  const databaseConfigured = Boolean(data?.databaseUrlSet || databaseUrl.trim());
+  const databaseConfigured = Boolean(
+    databaseHost.trim() &&
+      databaseUser.trim() &&
+      databaseName.trim() &&
+      (data?.databasePasswordSet || databasePassword.trim())
+  );
   const apiConfigured = Boolean(data?.apiKeySet || (apiUrl.trim() && apiKey?.trim()));
 
   useEffect(() => {
@@ -119,7 +151,11 @@ function AMemberSyncSettings() {
         tablePrefix: formData.tablePrefix,
         apiUrl: formData.apiUrl || undefined,
         apiKey: formData.apiKey || undefined,
-        databaseUrl: formData.databaseUrl || undefined,
+        databaseHost: formData.databaseHost || undefined,
+        databasePort: Number(formData.databasePort) || undefined,
+        databaseUser: formData.databaseUser || undefined,
+        databasePassword: formData.databasePassword || undefined,
+        databaseName: formData.databaseName || undefined,
       });
       toast.success(t('general.saved'));
     })
@@ -210,16 +246,28 @@ function AMemberSyncSettings() {
 
               {isDatabaseInbound ? (
                 <>
-                  <FormField title="tenants.amember_sync.database_url">
+                  <FormField title="tenants.amember_sync.database_host">
+                    <TextInput placeholder="db.example.com" {...register('databaseHost')} />
+                  </FormField>
+                  <FormField title="tenants.amember_sync.database_port">
+                    <TextInput type="number" min={1} {...register('databasePort')} />
+                  </FormField>
+                  <FormField title="tenants.amember_sync.database_user">
+                    <TextInput {...register('databaseUser')} />
+                  </FormField>
+                  <FormField title="tenants.amember_sync.database_password">
                     <TextInput
                       type="password"
                       placeholder={
-                        data?.databaseUrlSet
+                        data?.databasePasswordSet
                           ? t('tenants.amember_sync.secret_saved_placeholder')
-                          : 'mysql://user:pass@host:3306/amember'
+                          : undefined
                       }
-                      {...register('databaseUrl')}
+                      {...register('databasePassword')}
                     />
+                  </FormField>
+                  <FormField title="tenants.amember_sync.database_name">
+                    <TextInput placeholder="amember" {...register('databaseName')} />
                   </FormField>
                   <p className={styles.hint}>
                     {databaseConfigured

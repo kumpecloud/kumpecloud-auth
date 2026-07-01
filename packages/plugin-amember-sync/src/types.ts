@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import type { AMemberSyncStoredConfig } from '@logto/schemas';
 
+import { resolveDatabaseUrl } from './database-connection.js';
+
 export type AMemberProduct = {
   productId: number;
   title: string;
@@ -76,8 +78,8 @@ export const amemberSyncConfigGuard = z
     if (config.inboundMode === 'database' && !config.databaseUrl) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'databaseUrl is required when inboundMode is database',
-        path: ['databaseUrl'],
+        message: 'database connection is required when inboundMode is database',
+        path: ['databaseHost'],
       });
     }
 
@@ -154,7 +156,7 @@ export const toAMemberSyncRuntimeConfig = (
     tablePrefix: stored.tablePrefix,
     apiUrl: stored.apiUrl,
     apiKey: stored.apiKey,
-    databaseUrl: stored.databaseUrl,
+    databaseUrl: resolveDatabaseUrl(stored),
   });
 
   if (!parsed.success) {
