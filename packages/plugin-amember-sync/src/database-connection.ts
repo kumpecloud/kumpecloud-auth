@@ -19,45 +19,59 @@ export type AMemberDatabaseConnectionResponse = {
   databasePasswordSet: boolean;
 };
 
+export type AMemberDatabaseStoredInput = {
+  databaseHost?: string;
+  databasePort?: number;
+  databaseUser?: string;
+  databasePassword?: string;
+  databaseName?: string;
+  databaseUrl?: string;
+};
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
-export const normalizeStoredDatabaseConfig = (
-  config: AMemberSyncStoredConfig
-): AMemberSyncStoredConfig => {
+const normalizeDatabaseInput = (input: AMemberDatabaseStoredInput): AMemberDatabaseStoredInput => {
   const hasDiscreteConnection =
-    isNonEmptyString(config.databaseHost) &&
-    isNonEmptyString(config.databaseUser) &&
-    isNonEmptyString(config.databaseName) &&
-    isNonEmptyString(config.databasePassword);
+    isNonEmptyString(input.databaseHost) &&
+    isNonEmptyString(input.databaseUser) &&
+    isNonEmptyString(input.databaseName) &&
+    isNonEmptyString(input.databasePassword);
 
   if (hasDiscreteConnection) {
     return {
-      ...config,
-      databasePort: config.databasePort ?? defaultDatabasePort,
+      ...input,
+      databasePort: input.databasePort ?? defaultDatabasePort,
     };
   }
 
-  if (!config.databaseUrl) {
-    return config;
+  if (!input.databaseUrl) {
+    return input;
   }
 
-  const dsn = parseDsn(config.databaseUrl);
+  const dsn = parseDsn(input.databaseUrl);
 
   return {
-    ...config,
-    databaseHost: config.databaseHost ?? dsn.host ?? undefined,
-    databasePort: config.databasePort ?? dsn.port ?? defaultDatabasePort,
-    databaseUser: config.databaseUser ?? dsn.username ?? undefined,
-    databasePassword: config.databasePassword ?? dsn.password ?? undefined,
-    databaseName: config.databaseName ?? dsn.databaseName ?? undefined,
+    ...input,
+    databaseHost: input.databaseHost ?? dsn.host ?? undefined,
+    databasePort: input.databasePort ?? dsn.port ?? defaultDatabasePort,
+    databaseUser: input.databaseUser ?? dsn.username ?? undefined,
+    databasePassword: input.databasePassword ?? dsn.password ?? undefined,
+    databaseName: input.databaseName ?? dsn.databaseName ?? undefined,
   };
 };
 
-export const resolveDatabaseConnectionFields = (
+export const normalizeStoredDatabaseConfig = (
   config: AMemberSyncStoredConfig
+): AMemberSyncStoredConfig => ({
+  ...config,
+  ...normalizeDatabaseInput(config),
+});
+
+export const resolveDatabaseConnectionFields = (
+  input: AMemberDatabaseStoredInput
 ): AMemberDatabaseConnectionFields | undefined => {
-  const normalized = normalizeStoredDatabaseConfig(config);
+  const normalized = normalizeDatabaseInput(input);
 
   if (
     !isNonEmptyString(normalized.databaseHost) ||
@@ -77,11 +91,11 @@ export const resolveDatabaseConnectionFields = (
   };
 };
 
-export const resolveDatabaseUrl = (config: AMemberSyncStoredConfig): string | undefined => {
-  const fields = resolveDatabaseConnectionFields(config);
+export const resolveDatabaseUrl = (input: AMemberDatabaseStoredInput): string | undefined => {
+  const fields = resolveDatabaseConnectionFields(input);
 
   if (!fields) {
-    return config.databaseUrl;
+    return input.databaseUrl;
   }
 
   return buildDatabaseUrl(fields);
@@ -116,5 +130,5 @@ export const toDatabaseConnectionResponse = (
   };
 };
 
-export const hasDatabaseConnection = (config: AMemberSyncStoredConfig): boolean =>
-  resolveDatabaseConnectionFields(config) !== undefined;
+export const hasDatabaseConnection = (input: AMemberDatabaseStoredInput): boolean =>
+  resolveDatabaseConnectionFields(input) !== undefined;
