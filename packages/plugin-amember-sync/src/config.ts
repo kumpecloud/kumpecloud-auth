@@ -37,7 +37,6 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
   const syncPasswords = !yes(getEnv('AMEMBER_SYNC_SKIP_PASSWORDS'));
   const roleSyncModeEnv = getEnv('AMEMBER_SYNC_ROLE_SYNC_MODE', 'one_way');
   const databaseUrl = resolveDatabaseUrl({
-    enabled: false,
     databaseHost: getEnv('AMEMBER_DATABASE_HOST') || undefined,
     databasePort: getEnv('AMEMBER_DATABASE_PORT')
       ? parseDatabasePort(getEnv('AMEMBER_DATABASE_PORT'))

@@ -19,7 +19,7 @@ export {
   resolveDatabaseUrl,
   toDatabaseConnectionResponse,
 } from './database-connection.js';
-export type { AMemberDatabaseConnectionFields, AMemberDatabaseConnectionResponse } from './database-connection.js';
+export type { AMemberDatabaseConnectionFields, AMemberDatabaseConnectionResponse, AMemberDatabaseStoredInput } from './database-connection.js';
 export {
   aMemberProfileFieldDescriptors,
   buildAMemberCustomData,
