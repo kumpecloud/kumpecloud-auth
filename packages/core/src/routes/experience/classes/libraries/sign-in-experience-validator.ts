@@ -1,6 +1,11 @@
 /* eslint-disable max-lines */
 import {
+  applyAMemberOutboundSignUpRequirements,
+  resolveAMemberOutboundConfig,
+} from '@logto/plugin-amember-sync';
+import {
   AlternativeSignUpIdentifier,
+  amemberSyncStoredConfigGuard,
   ForgotPasswordMethod,
   InteractionEvent,
   MfaFactor,
@@ -267,10 +272,25 @@ export class SignInExperienceValidator {
     return this.signInExperienceDataCache;
   }
 
+  private async getEffectiveSignUpSettings(): Promise<SignInExperience['signUp']> {
+    const { signUp } = await this.getSignInExperienceData();
+    const stored =
+      (await this.queries.logtoConfigs.getAMemberSyncConfig()) ??
+      amemberSyncStoredConfigGuard.parse({ enabled: false });
+
+    if (!resolveAMemberOutboundConfig(this.libraries.tenantId, stored)) {
+      return signUp;
+    }
+
+    return applyAMemberOutboundSignUpRequirements(signUp);
+  }
+
   public async getMandatoryUserProfileBySignUpMethods(): Promise<Set<MissingProfile>> {
     const {
-      signUp: { identifiers, password, secondaryIdentifiers = [] },
-    } = await this.getSignInExperienceData();
+      identifiers,
+      password,
+      secondaryIdentifiers = [],
+    } = await this.getEffectiveSignUpSettings();
 
     const mandatoryUserProfile = new Set<MissingProfile>();
 

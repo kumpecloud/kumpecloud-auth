@@ -56,6 +56,13 @@ const user = {
   identity_not_exists_in_current_user:
     'هویت مشخص‌شده در حساب کاربر فعلی وجود ندارد. لطفاً قبل از ادامه هویت را متصل کنید.',
   passkey_preferred: 'برای ساده‌تر کردن فرایند ورود، passkey ایجاد کنید.',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);

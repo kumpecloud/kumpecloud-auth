@@ -2,6 +2,7 @@ import got from 'got';
 
 import type { AMemberAccess } from '../types.js';
 
+import { createAMemberApiClient } from './amember-api-client.js';
 import { parseAMemberEntityId, readAMemberJsonResponse } from './api-response.js';
 
 export const amemberLifetimeExpireDate = '2037-12-31';
@@ -79,12 +80,7 @@ export const createApiAMemberDataSink = ({
   apiUrl: string;
   apiKey: string;
 }): AMemberDataSink => {
-  const client = got.extend({
-    prefixUrl: apiUrl.replace(/\/$/u, ''),
-    searchParams: { _key: apiKey },
-    responseType: 'json',
-    retry: { limit: 2 },
-  });
+  const client = createAMemberApiClient(apiUrl, apiKey);
 
   const findAccessRecord = async (userId: number, productId: number) => {
     const body = await readAMemberJsonResponse('list access', () =>

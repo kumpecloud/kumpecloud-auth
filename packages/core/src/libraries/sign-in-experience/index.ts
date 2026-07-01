@@ -1,4 +1,8 @@
 import { GoogleConnector } from '@logto/connector-kit';
+import {
+  applyAMemberOutboundSignUpRequirements,
+  resolveAMemberOutboundConfig,
+} from '@logto/plugin-amember-sync';
 import { builtInLanguages } from '@logto/phrases-experience';
 import type {
   AccountCenterSsrSignInExperience,
@@ -10,7 +14,13 @@ import type {
   SignInExperience,
   SsoConnectorMetadata,
 } from '@logto/schemas';
-import { adminTenantId, ConnectorType, ForgotPasswordMethod, TenantTag } from '@logto/schemas';
+import {
+  adminTenantId,
+  amemberSyncStoredConfigGuard,
+  ConnectorType,
+  ForgotPasswordMethod,
+  TenantTag,
+} from '@logto/schemas';
 import { deduplicate, trySafe, type Nullable } from '@silverhand/essentials';
 import deepmerge from 'deepmerge';
 
@@ -69,6 +79,7 @@ export const createSignInExperienceLibrary = (
     customProfileFields: { findAllCustomProfileFields },
     users: { findUsernameCaseConflicts, countUsernameCaseConflicts },
     organizations,
+    logtoConfigs: { getAMemberSyncConfig },
   } = queries;
 
   const validateLanguageInfo = async (languageInfo: LanguageInfo) => {
@@ -323,14 +334,24 @@ export const createSignInExperienceLibrary = (
       signInExperience.signUpProfileFields
     );
 
-    return {
-      ...deepmerge<SignInExperience, SignInExperienceOverride>(
-        deepmerge<SignInExperience, SignInExperienceOverride>(
-          signInExperience,
-          appSignInExperience
-        ),
-        organizationOverride
+    const mergedExperience = deepmerge<SignInExperience, SignInExperienceOverride>(
+      deepmerge<SignInExperience, SignInExperienceOverride>(
+        signInExperience,
+        appSignInExperience
       ),
+      organizationOverride
+    );
+
+    const stored =
+      (await getAMemberSyncConfig()) ??
+      amemberSyncStoredConfigGuard.parse({ enabled: false });
+    const signUp = resolveAMemberOutboundConfig(tenantId, stored)
+      ? applyAMemberOutboundSignUpRequirements(mergedExperience.signUp)
+      : mergedExperience.signUp;
+
+    return {
+      ...mergedExperience,
+      signUp,
       socialConnectors,
       ssoConnectors,
       forgotPassword: getForgotPassword(),

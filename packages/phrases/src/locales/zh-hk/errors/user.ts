@@ -55,6 +55,13 @@ const user = {
     '該使用者沒有企業身份鏈接到指定的 SSO 連接器 ID：{{ ssoConnectorId }}。',
   identity_not_exists_in_current_user: '指定的身份在當前使用者帳戶中不存在。請先鏈接該身份再繼續。',
   passkey_preferred: '建立通行密鑰以簡化登入流程。',
+  amember_provision_failed: 'Unable to create the user in aMember: {{message}}',
+  amember_email_required:
+    'Email address is required because aMember outbound sync is enabled.',
+  amember_username_required:
+    'Username is required because aMember outbound sync is enabled.',
+  amember_password_required:
+    'Password is required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);
