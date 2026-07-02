@@ -43,6 +43,22 @@ describe('createApiAMemberDataSink', () => {
     expect(userId).toBe(99);
   });
 
+  it('recovers the user id when create succeeds but the response body is not parseable', async () => {
+    scope().post('/amember/api/users').query({ _key: apiKey }).reply(200, 88);
+    scope()
+      .get('/amember/api/users')
+      .query({ _key: apiKey, '_filter[login]': 'jane@example.com' })
+      .reply(200, { _items: [{ user_id: 88, login: 'jane@example.com' }] });
+
+    const sink = createApiAMemberDataSink({ apiUrl, apiKey });
+    const userId = await sink.createUser({
+      login: 'jane@example.com',
+      email: 'jane@example.com',
+    });
+
+    expect(userId).toBe(88);
+  });
+
   it('throws when aMember returns an API error payload', async () => {
     scope()
       .post('/amember/api/users')

@@ -73,7 +73,7 @@ const toFormData = (data?: AMemberSyncConfigResponse): FormData => ({
 
 function AMemberSyncSettings() {
   const { t } = useTranslation(undefined, { keyPrefix: 'admin_console' });
-  const { data, isLoading, updateConfig, runSync } = useAMemberSyncConfig();
+  const { data, isLoading, updateConfig, runSync, testDatabaseConnection } = useAMemberSyncConfig();
   const methods = useForm<FormData>({
     defaultValues: toFormData(),
   });
@@ -162,9 +162,26 @@ function AMemberSyncSettings() {
   );
 
   const onRunSync = async () => {
-    await runSync();
-    toast.success(t('tenants.amember_sync.sync_triggered'));
+    try {
+      await runSync();
+      toast.success(t('tenants.amember_sync.sync_triggered'));
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
   };
+
+  const onTestDatabaseConnection = handleSubmit(
+    trySubmitSafe(async (formData) => {
+      await testDatabaseConnection({
+        databaseHost: formData.databaseHost || undefined,
+        databasePort: Number(formData.databasePort) || undefined,
+        databaseUser: formData.databaseUser || undefined,
+        databasePassword: formData.databasePassword || undefined,
+        databaseName: formData.databaseName || undefined,
+      });
+      toast.success(t('tenants.amember_sync.database_connection_ok'));
+    })
+  );
 
   return (
     <div className={styles.container}>
@@ -270,6 +287,9 @@ function AMemberSyncSettings() {
                     <TextInput placeholder="amember" {...register('databaseName')} />
                   </FormField>
                   <p className={styles.hint}>
+                    <DynamicT forKey="tenants.amember_sync.database_host_hint" />
+                  </p>
+                  <p className={styles.hint}>
                     {databaseConfigured
                       ? t('tenants.amember_sync.database_configured')
                       : t('tenants.amember_sync.database_not_configured')}
@@ -277,6 +297,13 @@ function AMemberSyncSettings() {
                   <FormField title="tenants.amember_sync.table_prefix">
                     <TextInput {...register('tablePrefix')} />
                   </FormField>
+                  <Button
+                    title="tenants.amember_sync.test_database_connection"
+                    disabled={!databaseConfigured || isLoading}
+                    onClick={() => {
+                      void onTestDatabaseConnection();
+                    }}
+                  />
                 </>
               ) : (
                 <p className={styles.hint}>

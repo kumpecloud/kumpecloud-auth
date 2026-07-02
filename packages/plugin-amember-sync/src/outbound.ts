@@ -70,6 +70,7 @@ export const pushLogtoUserToAMember = async ({
   plainPassword?: string;
 }): Promise<void> => {
   const sink = createSink(config);
+  const hadLinkedAMemberUser = getAMemberUserIdFromCustomData(user.customData ?? {}) !== undefined;
   const amemberUserId = await resolveAMemberUserId({
     user,
     sink,
@@ -80,8 +81,10 @@ export const pushLogtoUserToAMember = async ({
 
   const fields = buildLogtoUserToAMemberFields(user, { plainPassword });
 
-  if (getAMemberUserIdFromCustomData(user.customData ?? {}) !== undefined) {
+  if (hadLinkedAMemberUser) {
     await sink.updateUser(amemberUserId, fields);
+  } else if (plainPassword) {
+    await sink.updateUser(amemberUserId, { pass: plainPassword });
   }
 
   const customData = touchAMemberOutboundPush(

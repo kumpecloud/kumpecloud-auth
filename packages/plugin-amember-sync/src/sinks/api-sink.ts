@@ -3,7 +3,11 @@ import got from 'got';
 import type { AMemberAccess } from '../types.js';
 
 import { createAMemberApiClient } from './amember-api-client.js';
-import { parseAMemberEntityId, readAMemberJsonResponse } from './api-response.js';
+import {
+  executeAMemberJsonRequest,
+  parseAMemberEntityId,
+  readAMemberJsonResponse,
+} from './api-response.js';
 
 export const amemberLifetimeExpireDate = '2037-12-31';
 
@@ -73,6 +77,55 @@ export type AMemberDataSink = {
   revokeProductAccess: (userId: number, productId: number) => Promise<void>;
 };
 
+type RawUser = {
+  user_id?: number;
+  userId?: number;
+  login?: string;
+  email?: string;
+};
+
+const findUserIdByLoginOrEmail = async (
+  client: ReturnType<typeof createAMemberApiClient>,
+  { login, email }: { login?: string; email?: string }
+): Promise<number | undefined> => {
+  const filters: Array<Record<string, string>> = [];
+
+  if (login?.trim()) {
+    filters.push({ '_filter[login]': login.trim() });
+  }
+
+  if (email?.trim()) {
+    filters.push({ '_filter[email]': email.trim() });
+  }
+
+  for (const searchParams of filters) {
+    const body = await executeAMemberJsonRequest('find user', () =>
+      client.get('users', { searchParams }).json<unknown>()
+    );
+
+    const [user] = extractItems<RawUser>(body);
+    const userId = toNumber(user?.user_id ?? user?.userId);
+
+    if (userId !== undefined) {
+      return userId;
+    }
+  }
+
+  return;
+};
+
+const isRecoverableCreateUserResponseError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('unexpected response') ||
+    error.message.includes('did not return a user id') ||
+    error.message.includes('returned no response body')
+  );
+};
+
 export const createApiAMemberDataSink = ({
   apiUrl,
   apiKey,
@@ -103,15 +156,29 @@ export const createApiAMemberDataSink = ({
 
   return {
     createUser: async (fields) => {
-      const body = await readAMemberJsonResponse('create user', () =>
-        client
-          .post('users', {
-            form: fields,
-          })
-          .json<unknown>()
-      );
+      try {
+        const body = await readAMemberJsonResponse('create user', () =>
+          client
+            .post('users', {
+              form: fields,
+            })
+            .json<unknown>()
+        );
 
-      return parseAMemberEntityId(body, ['user_id', 'userId'], 'user', 'create user');
+        return parseAMemberEntityId(body, ['user_id', 'userId'], 'user', 'create user');
+      } catch (error: unknown) {
+        if (!isRecoverableCreateUserResponseError(error)) {
+          throw error;
+        }
+
+        const recoveredUserId = await findUserIdByLoginOrEmail(client, fields);
+
+        if (recoveredUserId !== undefined) {
+          return recoveredUserId;
+        }
+
+        throw error;
+      }
     },
     updateUser: async (userId, fields) => {
       await readAMemberJsonResponse('update user', () =>

@@ -26,6 +26,9 @@ const useAMemberSyncConfig = () => {
       runSync: async () => {
         await api.post('api/configs/amember-sync/run');
       },
+      testDatabaseConnection: async (config: AMemberSyncConfigPatch) => {
+        await api.post('api/configs/amember-sync/test-database', { json: config });
+      },
     }),
     [api, data, error, isLoading, mutate]
   );

@@ -26,6 +26,13 @@ export {
 } from './database-connection.js';
 export type { AMemberDatabaseConnectionFields, AMemberDatabaseConnectionResponse, AMemberDatabaseStoredInput } from './database-connection.js';
 export {
+  AMemberDatabaseConnectionError,
+  connectAMemberDatabase,
+  defaultDatabaseConnectTimeoutMs,
+  formatAMemberDatabaseConnectionError,
+  testAMemberDatabaseConnection,
+} from './mysql-connection.js';
+export {
   aMemberProfileFieldDescriptors,
   buildAMemberCustomData,
   buildAMemberSyncedCustomDataFields,

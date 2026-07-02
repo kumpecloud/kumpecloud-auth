@@ -59,9 +59,12 @@ export class ProvisionLibrary {
   async createUser(profile: InteractionProfile, plainPassword?: string) {
     const {
       libraries: {
-        users: { generateUserId, insertUser, deleteUserById },
+        users: { generateUserId, insertUser },
         socials: { upsertSocialTokenSetSecret },
         ssoConnectors: { upsertEnterpriseSsoTokenSetSecret },
+      },
+      queries: {
+        users: { deleteUserById },
       },
     } = this.tenantContext;
 
@@ -111,7 +114,12 @@ export class ProvisionLibrary {
     try {
       await provisionCreatedUserToAMember(this.tenantContext.id, user, plainPassword);
     } catch (error: unknown) {
-      await deleteUserById(user.id);
+      await trySafe(
+        async () => deleteUserById(user.id),
+        (deleteError) => {
+          void appInsights.trackException(deleteError, buildAppInsightsTelemetry(this.ctx));
+        }
+      );
       throw error;
     }
 

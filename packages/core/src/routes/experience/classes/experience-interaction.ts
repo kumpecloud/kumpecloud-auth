@@ -77,6 +77,9 @@ export default class ExperienceInteraction {
     skipped: false,
   };
 
+  /** Plaintext password for outbound aMember provisioning; persisted in interaction storage. */
+  #pendingOutboundPassword?: string;
+
   /** The interaction event for the current interaction. */
   #interactionEvent: InteractionEvent;
 
@@ -109,6 +112,10 @@ export default class ExperienceInteraction {
         this.getVerificationRecordByTypeAndId(type, verificationId),
       getVerificationRecordById: (verificationId) => this.getVerificationRecordById(verificationId),
       getCurrentProfile: () => this.profile.data,
+      setPendingOutboundPassword: (password) => {
+        this.#pendingOutboundPassword = password;
+      },
+      takePendingOutboundPassword: () => this.takePendingOutboundPassword(),
     };
 
     this.adaptiveMfaValidator = new AdaptiveMfaValidator({
@@ -143,10 +150,12 @@ export default class ExperienceInteraction {
         verified: false,
         skipped: false,
       },
+      pendingOutboundPassword,
     } = result.data;
 
     this.#interactionEvent = interactionEvent;
     this.userId = userId;
+    this.#pendingOutboundPassword = pendingOutboundPassword;
     this.profile = new Profile(libraries, queries, profile, interactionContext);
     this.mfa = new Mfa(libraries, queries, mfa, interactionContext);
     this.captcha = captcha;
@@ -308,7 +317,7 @@ export default class ExperienceInteraction {
     });
 
     const plainPassword =
-      this.profile.takePendingOutboundPassword() ??
+      this.takePendingOutboundPassword() ??
       (verificationId
         ? (() => {
             const record = this.getVerificationRecordById(verificationId);
@@ -698,8 +707,16 @@ export default class ExperienceInteraction {
       mfa: this.mfa.data,
       verificationRecords: this.verificationRecordsArray.map((record) => record.toJson()),
       captcha,
+      pendingOutboundPassword: this.#pendingOutboundPassword,
       ...conditional(signInContext && { signInContext }),
     };
+  }
+
+  public takePendingOutboundPassword() {
+    const password = this.#pendingOutboundPassword;
+    this.#pendingOutboundPassword = undefined;
+
+    return password;
   }
 
   public toSanitizedJson(): SanitizedInteractionStorageData {

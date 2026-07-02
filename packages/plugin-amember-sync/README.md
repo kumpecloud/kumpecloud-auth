@@ -79,6 +79,8 @@ AMEMBER_API_KEY=your-rest-api-key
 
 Console-stored configuration takes precedence over environment variables when enabled.
 
+**Docker / staging:** The auth service must reach MySQL over the network. Use the aMember server's internal IP, Nebula/VPN address, or a shared Docker network hostname—not `localhost` unless MySQL runs in the same container as auth. Use **Test MySQL connection** in Console to verify reachability before running sync.
+
 **Outbound** (Auth → aMember) only requires the outbound toggle plus API URL and key. Inbound sync does not need to be enabled, and MySQL credentials are not required for outbound-only setups.
 
 When outbound sync is configured, **Logto user creation fails** if the matching aMember user cannot be created (the Logto user is rolled back). Profile, password, and role updates remain best-effort async pushes.

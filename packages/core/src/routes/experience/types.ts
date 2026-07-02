@@ -160,6 +160,8 @@ export type InteractionContext = {
     verificationId: string
   ) => VerificationRecordMap[K];
   getCurrentProfile: () => InteractionProfile;
+  setPendingOutboundPassword: (password: string) => void;
+  takePendingOutboundPassword: () => string | undefined;
 };
 
 export type ExperienceInteractionRouterContext<ContextT extends WithLogContext = WithLogContext> =
@@ -190,6 +192,8 @@ export type InteractionStorage = {
     verified: boolean;
     skipped: boolean;
   };
+  /** Plaintext password kept only for outbound aMember provisioning between interaction steps. */
+  pendingOutboundPassword?: string;
 };
 
 export const interactionStorageGuard = z.object({
@@ -205,6 +209,7 @@ export const interactionStorageGuard = z.object({
       skipped: z.boolean(),
     })
     .optional(),
+  pendingOutboundPassword: z.string().optional(),
 }) satisfies ToZodObject<InteractionStorage>;
 
 export type SanitizedInteractionStorageData = {

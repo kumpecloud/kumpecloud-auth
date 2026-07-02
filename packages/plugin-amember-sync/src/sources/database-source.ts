@@ -2,6 +2,7 @@ import mysql from 'mysql2/promise';
 
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
+import { connectAMemberDatabase } from '../mysql-connection.js';
 import { parseAMemberUserProfileFields, resolveDatabaseUserSelectColumns } from '../profile-fields.js';
 import { buildAMemberUserName, normalizeAMemberDateString } from '../utils.js';
 
@@ -28,7 +29,7 @@ export const createDatabaseAMemberDataSource = ({
   const userTable = `${prefix}user`;
   const accessTable = `${prefix}access`;
 
-  const getConnection = async () => mysql.createConnection(databaseUrl);
+  const getConnection = async () => connectAMemberDatabase(databaseUrl);
 
   let cachedUserSelectColumns: string[] | undefined;
 

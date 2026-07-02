@@ -82,6 +82,8 @@ const tenants = {
     database_user: 'Username',
     database_password: 'Password',
     database_name: 'Database',
+    database_host_hint:
+      'Use a hostname or IP reachable from the auth container. localhost only works if MySQL runs in the same container.',
     table_prefix: 'Table prefix',
     secret_saved_placeholder: 'Saved — leave blank to keep current value',
     hybrid_recommended:
@@ -93,6 +95,8 @@ const tenants = {
     api_not_configured: 'API URL and key are required for outbound sync.',
     run_now: 'Run inbound sync now',
     sync_triggered: 'aMember inbound sync started.',
+    test_database_connection: 'Test MySQL connection',
+    database_connection_ok: 'MySQL connection succeeded.',
   },
   deletion_card: {
     title: 'DELETE',

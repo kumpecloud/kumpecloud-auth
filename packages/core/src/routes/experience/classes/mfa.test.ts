@@ -48,6 +48,8 @@ const createMfa = ({
       throw new Error('should not be called');
     },
     getCurrentProfile: () => currentProfile,
+    setPendingOutboundPassword: jest.fn(),
+    takePendingOutboundPassword: jest.fn(),
   };
 
   const mfa = new Mfa({} as Libraries, {} as Queries, {}, interactionContext);

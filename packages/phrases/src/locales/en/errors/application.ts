@@ -53,6 +53,7 @@ const application = {
       'Service provider initiated SAML SSO session not found.',
     state_mismatch: '`state` mismatch.',
   },
+  amember_sync_database_connection_failed: '{{message}}',
 };
 
 export default Object.freeze(application);
