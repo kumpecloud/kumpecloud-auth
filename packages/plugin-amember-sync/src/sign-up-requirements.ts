@@ -1,33 +1,40 @@
-import type { MissingProfile, SignUp, SignUpIdentifier } from '@logto/schemas';
+import {
+  AlternativeSignUpIdentifier,
+  MissingProfile,
+  SignInIdentifier,
+  type SignUp,
+} from '@logto/schemas';
 
 const signInIdentifier = {
-  username: 'username',
-  email: 'email',
+  username: SignInIdentifier.Username,
+  email: SignInIdentifier.Email,
 } as const;
 
 const alternativeSignUpIdentifier = {
-  emailOrPhone: 'emailOrPhone',
+  emailOrPhone: AlternativeSignUpIdentifier.EmailOrPhone,
 } as const;
 
 const missingProfile = {
-  email: 'email',
-  username: 'username',
-  password: 'password',
+  email: MissingProfile.email,
+  username: MissingProfile.username,
+  password: MissingProfile.password,
 } as const satisfies Record<string, MissingProfile>;
 
-const hasPrimaryIdentifier = (signUp: SignUp, identifier: SignUpIdentifier) =>
-  signUp.identifiers.includes(identifier as SignUp['identifiers'][number]);
+// Primary and injected secondary identifiers are always SignInIdentifier values.
+// AlternativeSignUpIdentifier (e.g. emailOrPhone) is only handled when filtering existing settings.
+const hasPrimaryIdentifier = (signUp: SignUp, identifier: SignInIdentifier) =>
+  signUp.identifiers.includes(identifier);
 
-const hasSecondaryIdentifier = (signUp: SignUp, identifier: SignUpIdentifier) =>
+const hasSecondarySignInIdentifier = (signUp: SignUp, identifier: SignInIdentifier) =>
   signUp.secondaryIdentifiers?.some((entry) => entry.identifier === identifier) ?? false;
 
 const hasEmailSignUpRequirement = (signUp: SignUp) =>
   hasPrimaryIdentifier(signUp, signInIdentifier.email) ||
-  hasSecondaryIdentifier(signUp, signInIdentifier.email);
+  hasSecondarySignInIdentifier(signUp, signInIdentifier.email);
 
 const hasUsernameSignUpRequirement = (signUp: SignUp) =>
   hasPrimaryIdentifier(signUp, signInIdentifier.username) ||
-  hasSecondaryIdentifier(signUp, signInIdentifier.username);
+  hasSecondarySignInIdentifier(signUp, signInIdentifier.username);
 
 /**
  * When outbound aMember sync is enabled, signups must collect email, username, and password.
@@ -38,7 +45,7 @@ export const applyAMemberOutboundSignUpRequirements = (signUp: SignUp): SignUp =
     (entry) => entry.identifier !== alternativeSignUpIdentifier.emailOrPhone
   );
 
-  const addSecondaryIdentifier = (identifier: SignUpIdentifier) => {
+  const addSecondaryIdentifier = (identifier: SignInIdentifier) => {
     if (
       hasPrimaryIdentifier(signUp, identifier) ||
       secondaryIdentifiers.some((entry) => entry.identifier === identifier)
