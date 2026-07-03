@@ -18,13 +18,17 @@ describe('applyAMemberOutboundSignUpProfileFields()', () => {
     );
 
     expect(catalog.map(({ name }) => name)).toEqual(['fullname', 'birthdate', 'address']);
-    expect(signUpProfileFields).toBeNull();
+    expect(signUpProfileFields).toEqual([
+      { name: 'fullname' },
+      { name: 'birthdate' },
+      { name: 'address' },
+    ]);
     expect(catalog.every((field) => field.tenantId === tenantId && field.id && field.sieOrder)).toBe(
       true
     );
   });
 
-  it('appends required fields to an explicit sign-up field list', () => {
+  it('uses only aMember-required fields during sign-up even when extra fields are configured', () => {
     const { catalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields(
       tenantId,
       [],
@@ -33,7 +37,33 @@ describe('applyAMemberOutboundSignUpProfileFields()', () => {
 
     expect(catalog.map(({ name }) => name)).toEqual(['fullname', 'birthdate', 'address']);
     expect(signUpProfileFields).toEqual([
-      { name: 'website' },
+      { name: 'fullname' },
+      { name: 'birthdate' },
+      { name: 'address' },
+    ]);
+  });
+
+  it('removes standalone profile fields that duplicate outbound composite fields', () => {
+    const standaloneGivenName: CustomProfileField = {
+      tenantId,
+      id: 'given-name-text',
+      name: 'givenName',
+      type: CustomProfileFieldType.Text,
+      label: 'ZIP code',
+      description: '',
+      required: true,
+      createdAt: 1,
+      sieOrder: 1,
+    };
+
+    const { catalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields(
+      tenantId,
+      [standaloneGivenName],
+      null
+    );
+
+    expect(catalog.map(({ name }) => name)).toEqual(['fullname', 'birthdate', 'address']);
+    expect(signUpProfileFields).toEqual([
       { name: 'fullname' },
       { name: 'birthdate' },
       { name: 'address' },

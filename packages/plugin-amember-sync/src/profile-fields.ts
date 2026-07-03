@@ -483,14 +483,8 @@ export const buildLogtoUserToAMemberFields = (
   const address = profile.address;
 
   if (address) {
-    const { street, street2 } = splitStreetAddress(address.streetAddress);
-
-    if (street) {
-      fields.street = street;
-    }
-
-    if (street2) {
-      fields.street2 = street2;
+    if (address.streetAddress) {
+      fields.street = address.streetAddress;
     }
 
     if (address.locality) {

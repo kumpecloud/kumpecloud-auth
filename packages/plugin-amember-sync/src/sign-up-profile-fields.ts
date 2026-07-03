@@ -120,6 +120,28 @@ const toSyntheticCustomProfileField = (
     sieOrder,
   }) as CustomProfileField;
 
+const standaloneProfileFieldNames = new Set([
+  'givenName',
+  'familyName',
+  'middleName',
+  'streetAddress',
+  'locality',
+  'region',
+  'postalCode',
+  'country',
+]);
+
+/** Drop standalone text fields that duplicate outbound composite profile fields. */
+const filterConflictingStandaloneProfileFields = (
+  catalog: CustomProfileField[]
+): CustomProfileField[] =>
+  catalog.filter(
+    (field) =>
+      aMemberOutboundSignUpProfileFieldNames.includes(
+        field.name as AMemberOutboundSignUpProfileFieldName
+      ) || !standaloneProfileFieldNames.has(field.name)
+  );
+
 const ensureOutboundRequiredField = (
   catalogByName: Map<string, CustomProfileField>,
   field: FullnameProfileField | DateProfileField | AddressProfileField,
@@ -127,23 +149,20 @@ const ensureOutboundRequiredField = (
   allocateSieOrder: () => number
 ) => {
   const existing = catalogByName.get(field.name);
-
-  if (existing && existing.type === field.type) {
-    const merged = toSyntheticCustomProfileField(tenantId, field, existing.sieOrder);
-
-    catalogByName.set(field.name, {
-      ...merged,
-      id: existing.id,
-      createdAt: existing.createdAt,
-      description: existing.description || merged.description,
-      label: existing.label || merged.label,
-    });
-    return;
-  }
+  const sieOrder = existing?.sieOrder ?? allocateSieOrder();
+  const replacement = toSyntheticCustomProfileField(tenantId, field, sieOrder);
 
   catalogByName.set(
     field.name,
-    toSyntheticCustomProfileField(tenantId, field, allocateSieOrder())
+    existing
+      ? {
+          ...replacement,
+          id: existing.id,
+          createdAt: existing.createdAt,
+          description: existing.description || replacement.description,
+          label: existing.label || replacement.label,
+        }
+      : replacement
   );
 };
 
@@ -172,26 +191,15 @@ export const applyAMemberOutboundSignUpProfileFields = (
     ensureOutboundRequiredField(catalogByName, field, tenantId, allocateSieOrder);
   }
 
-  const mergedCatalog = [...catalogByName.values()];
+  const mergedCatalog = filterConflictingStandaloneProfileFields([...catalogByName.values()]);
   const requiredItems: SignUpProfileFields = aMemberOutboundSignUpProfileFieldNames.map((name) => ({
     name,
   }));
 
-  if (!signUpProfileFields) {
-    return {
-      catalog: mergedCatalog,
-      signUpProfileFields: null,
-    };
-  }
-
-  const signUpFieldNames = new Set(signUpProfileFields.map(({ name }) => name));
-
   return {
     catalog: mergedCatalog,
-    signUpProfileFields: [
-      ...signUpProfileFields,
-      ...requiredItems.filter(({ name }) => !signUpFieldNames.has(name)),
-    ],
+    // Collect only the aMember-required composite fields during sign-up.
+    signUpProfileFields: requiredItems,
   };
 };
 

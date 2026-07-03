@@ -127,6 +127,34 @@ describe('buildLogtoUserToAMemberFields', () => {
       })
     );
   });
+
+  it('maps address fields to aMember columns', () => {
+    expect(
+      buildLogtoUserToAMemberFields({
+        username: 'jane',
+        primaryEmail: 'jane@example.com',
+        profile: {
+          givenName: 'Jane',
+          familyName: 'Doe',
+          address: {
+            streetAddress: '123 Main St',
+            locality: 'Springfield',
+            region: 'IL',
+            postalCode: '62701',
+          },
+        },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        name_f: 'Jane',
+        name_l: 'Doe',
+        street: '123 Main St',
+        city: 'Springfield',
+        state: 'IL',
+        zip: '62701',
+      })
+    );
+  });
 });
 
 describe('wasRecentlyPushedToAMember', () => {
