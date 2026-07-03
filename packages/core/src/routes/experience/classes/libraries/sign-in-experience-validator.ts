@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import {
   applyAMemberOutboundSignUpRequirements,
+  applyAMemberOutboundSignUpProfileFields,
   resolveAMemberOutboundConfig,
 } from '@logto/plugin-amember-sync';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@logto/schemas';
 
 import RequestError from '#src/errors/RequestError/index.js';
+import { resolveSignUpCustomProfileFields } from '#src/libraries/custom-profile-fields/utils.js';
 import { validateEmailAgainstBlocklistPolicy } from '#src/libraries/sign-in-experience/index.js';
 import type Libraries from '#src/tenants/Libraries.js';
 import type Queries from '#src/tenants/Queries.js';
@@ -326,7 +328,36 @@ export class SignInExperienceValidator {
       mandatoryUserProfile.add(MissingProfile.password);
     }
 
+    const stored =
+      (await this.queries.logtoConfigs.getAMemberSyncConfig()) ??
+      amemberSyncStoredConfigGuard.parse({ enabled: false });
+
+    if (resolveAMemberOutboundConfig(this.libraries.tenantId, stored)) {
+      mandatoryUserProfile.add(MissingProfile.extraProfile);
+    }
+
     return mandatoryUserProfile;
+  }
+
+  public async resolveSignUpCustomProfileFieldsForRegister() {
+    const [catalog, signInExperience] = await Promise.all([
+      this.queries.customProfileFields.findAllCustomProfileFields(),
+      this.getSignInExperienceData(),
+    ]);
+    const stored =
+      (await this.queries.logtoConfigs.getAMemberSyncConfig()) ??
+      amemberSyncStoredConfigGuard.parse({ enabled: false });
+
+    if (!resolveAMemberOutboundConfig(this.libraries.tenantId, stored)) {
+      return resolveSignUpCustomProfileFields(catalog, signInExperience.signUpProfileFields);
+    }
+
+    const { catalog: mergedCatalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields(
+      catalog,
+      signInExperience.signUpProfileFields
+    );
+
+    return resolveSignUpCustomProfileFields(mergedCatalog, signUpProfileFields);
   }
 
   /**

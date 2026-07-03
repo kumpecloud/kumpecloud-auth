@@ -36,7 +36,7 @@ export const createAMemberSyncContext = (
 ): AMemberSyncContext => {
   const {
     roles: { insertRole, updateRoleById, deleteRoleById, findRolesByRoleIds },
-    users: { updateUserById },
+    users: { updateUserById, deleteUserById },
     usersRoles: { findUsersRolesByUserId, insertUsersRoles, deleteUsersRolesByUserIdAndRoleId },
   } = queries;
   const { generateUserId, insertUser, signOutUser } = usersLibrary;
@@ -191,6 +191,10 @@ export const createAMemberSyncContext = (
       if (suspensionUpdate.isSuspended && !existing?.isSuspended) {
         await signOutUser(userId);
       }
+    },
+    deleteLogtoUserFromAMember: async (userId) => {
+      await signOutUser(userId);
+      await deleteUserById(userId);
     },
     syncUserAMemberRoles: async (userId, productIds, roleByProductId) => {
       const desiredRoleIds = new Set(

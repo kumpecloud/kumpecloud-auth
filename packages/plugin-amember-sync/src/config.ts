@@ -38,6 +38,9 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
   const tenantId = getEnv('AMEMBER_SYNC_TENANT_ID', defaultTenantId);
   const intervalSeconds = parseIntervalSeconds(getEnv('AMEMBER_SYNC_INTERVAL_SECONDS'));
   const syncPasswords = !yes(getEnv('AMEMBER_SYNC_SKIP_PASSWORDS'));
+  const deleteLogtoUsersWhenRemovedFromAMember = yes(
+    getEnv('AMEMBER_SYNC_DELETE_LOGTO_USERS_WHEN_REMOVED')
+  );
   const roleSyncModeEnv = getEnv('AMEMBER_SYNC_ROLE_SYNC_MODE', 'one_way');
   const databaseUrl = resolveDatabaseUrl({
     databaseHost: getEnv('AMEMBER_DATABASE_HOST') || undefined,
@@ -60,6 +63,7 @@ export const loadAMemberSyncConfigFromEnv = (): AMemberSyncConfig | undefined =>
     tenantId,
     intervalSeconds,
     syncPasswords,
+    deleteLogtoUsersWhenRemovedFromAMember,
     inboundMode,
     tablePrefix: getEnv('AMEMBER_TABLE_PREFIX', 'am_'),
     databaseUrl,

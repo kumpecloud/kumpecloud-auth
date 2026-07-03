@@ -34,6 +34,7 @@ export type AMemberSyncContext = {
   }>;
   createUserFromAMember: (user: AMemberUser) => Promise<LogtoUserRecord>;
   updateUserFromAMember: (userId: string, user: AMemberUser) => Promise<void>;
+  deleteLogtoUserFromAMember: (userId: string) => Promise<void>;
   syncUserAMemberRoles: (
     userId: string,
     productIds: number[],

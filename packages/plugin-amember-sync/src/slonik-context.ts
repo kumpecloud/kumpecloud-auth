@@ -324,5 +324,12 @@ export const createSlonikAMemberSyncContext = (
 
       return { added, removed };
     },
+    deleteLogtoUserFromAMember: async (userId) => {
+      await pool.query(sql`
+        delete from ${usersTable}
+        where tenant_id = ${tenantId}
+          and id = ${userId}
+      `);
+    },
   };
 };

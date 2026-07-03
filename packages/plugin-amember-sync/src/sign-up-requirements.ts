@@ -3,7 +3,10 @@ import {
   MissingProfile,
   SignInIdentifier,
   type SignUp,
+  type UserProfile,
 } from '@logto/schemas';
+
+import { validateAMemberOutboundUserProfile } from './sign-up-profile-fields.js';
 
 const signInIdentifier = {
   username: SignInIdentifier.Username,
@@ -18,6 +21,7 @@ const missingProfile = {
   email: MissingProfile.email,
   username: MissingProfile.username,
   password: MissingProfile.password,
+  extraProfile: MissingProfile.extraProfile,
 } as const satisfies Record<string, MissingProfile>;
 
 // Primary and injected secondary identifiers are always SignInIdentifier values.
@@ -76,4 +80,13 @@ export const getAMemberOutboundMandatoryProfiles = (): Set<MissingProfile> =>
     missingProfile.email,
     missingProfile.username,
     missingProfile.password,
+    missingProfile.extraProfile,
   ]);
+
+export const assertAMemberOutboundUserProfile = (profile?: UserProfile | null): void => {
+  if (validateAMemberOutboundUserProfile(profile).length > 0) {
+    throw new Error(
+      'Cannot push user to aMember without first name, last name, date of birth, and full address'
+    );
+  }
+};

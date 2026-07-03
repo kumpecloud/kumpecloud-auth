@@ -54,6 +54,7 @@ describe('getAMemberOutboundMandatoryProfiles()', () => {
       'email',
       'username',
       'password',
+      'extraProfile',
     ]);
   });
 });

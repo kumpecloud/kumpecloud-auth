@@ -50,7 +50,7 @@ const sync: CommandModule<Record<string, never>, { tenant?: string }> = {
       });
 
       consoleLog.succeed(
-        `Sync complete: ${stats.productsCreated} roles created, ${stats.usersCreated} users created, ${stats.usersUpdated} users updated, ${stats.usersSkipped} skipped, ${stats.roleAssignmentsAdded} role assignments added`
+        `Sync complete: ${stats.productsCreated} roles created, ${stats.usersCreated} users created, ${stats.usersUpdated} users updated, ${stats.usersSkipped} skipped, ${stats.usersDeleted} deleted, ${stats.roleAssignmentsAdded} role assignments added`
       );
     } finally {
       await pool.end();

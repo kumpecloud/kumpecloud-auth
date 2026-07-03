@@ -88,6 +88,7 @@ export class ProvisionLibrary {
       primaryEmail: rest.primaryEmail,
       passwordEncrypted,
       plainPassword,
+      profile: rest.profile,
     });
 
     const [user] = await insertUser(

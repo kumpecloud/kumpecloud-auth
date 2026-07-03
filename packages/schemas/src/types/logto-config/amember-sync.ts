@@ -18,6 +18,8 @@ export const amemberSyncStoredConfigGuard = z.object({
   mode: amemberSyncModeGuard.optional(),
   intervalSeconds: z.number().int().positive().default(3600),
   syncPasswords: z.boolean().default(true),
+  /** When enabled, inbound sync deletes Logto users whose linked aMember account was removed or marked deleted. */
+  deleteLogtoUsersWhenRemovedFromAMember: z.boolean().default(false),
   tablePrefix: z.string().default('am_'),
   apiUrl: z.string().optional(),
   apiKey: z.string().optional(),

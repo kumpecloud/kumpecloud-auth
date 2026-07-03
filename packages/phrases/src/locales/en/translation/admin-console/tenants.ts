@@ -71,6 +71,9 @@ const tenants = {
     enabled: 'Enable automatic inbound sync',
     interval_seconds: 'Inbound sync interval (seconds)',
     sync_passwords: 'Sync password hashes from aMember',
+    delete_logto_users_when_removed: 'Delete Logto users removed from aMember',
+    delete_logto_users_when_removed_hint:
+      'When enabled, inbound sync permanently deletes Logto users whose linked aMember account is inactive, marked deleted, or no longer returned by aMember. Off by default.',
     identity_hint:
       'User passkeys, social identities, MFA settings, and other Logto profile data are never modified by aMember sync.',
     mode_api: 'aMember REST API',

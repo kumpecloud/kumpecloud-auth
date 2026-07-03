@@ -57,8 +57,15 @@ export {
 export { runAMemberSync } from './sync.js';
 export {
   applyAMemberOutboundSignUpRequirements,
+  assertAMemberOutboundUserProfile,
   getAMemberOutboundMandatoryProfiles,
 } from './sign-up-requirements.js';
+export {
+  applyAMemberOutboundSignUpProfileFields,
+  aMemberOutboundSignUpProfileFieldNames,
+  createAMemberOutboundDefaultProfileFields,
+  validateAMemberOutboundUserProfile,
+} from './sign-up-profile-fields.js';
 export {
   buildAMemberPhoneUpdate,
   buildAMemberSuspensionUpdate,

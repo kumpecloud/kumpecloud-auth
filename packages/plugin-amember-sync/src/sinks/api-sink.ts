@@ -71,6 +71,7 @@ const mapAccess = (raw: RawAccess): (AMemberAccess & { accessId?: number }) | un
 };
 
 export type AMemberDataSink = {
+  findUserByLoginOrEmail: (params: { login?: string; email?: string }) => Promise<number | undefined>;
   createUser: (fields: Record<string, string>) => Promise<number>;
   updateUser: (userId: number, fields: Record<string, string>) => Promise<void>;
   grantLifetimeAccess: (userId: number, productId: number) => Promise<void>;
@@ -155,6 +156,8 @@ export const createApiAMemberDataSink = ({
   };
 
   return {
+    findUserByLoginOrEmail: async ({ login, email }) =>
+      findUserIdByLoginOrEmail(client, { login, email }),
     createUser: async (fields) => {
       try {
         const body = await readAMemberJsonResponse('create user', () =>

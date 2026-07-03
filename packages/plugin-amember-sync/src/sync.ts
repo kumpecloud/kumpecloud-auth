@@ -18,6 +18,7 @@ const emptyStats = (): AMemberSyncStats => ({
   usersCreated: 0,
   usersUpdated: 0,
   usersSkipped: 0,
+  usersDeleted: 0,
   roleAssignmentsAdded: 0,
   roleAssignmentsRemoved: 0,
   rolesRevokedDueToInactivity: 0,
@@ -124,8 +125,10 @@ export const runAMemberSync = async ({
   logger.info(`Syncing ${users.length} aMember users...`);
   const userIndexes = await context.findUsersIndexed();
   const logtoUserIdByAMemberUserId = new Map<number, string>();
+  const seenAMemberUserIds = new Set<number>();
 
   for (const user of users) {
+    seenAMemberUserIds.add(user.userId);
     const identity = resolveAMemberUserIdentity(user);
 
     if (!identity || (!identity.email && !identity.username)) {
@@ -186,28 +189,56 @@ export const runAMemberSync = async ({
     }
   };
 
-  for (const amemberUserId of logtoUserIdByAMemberUserId.keys()) {
-    if (activeAMemberUserIds.has(amemberUserId)) {
-      continue;
+  const deleteLogtoUserForRemovedAMemberAccount = async (
+    logtoUserId: string,
+    amemberUserId: number,
+    reason: 'inactive' | 'removed'
+  ) => {
+    logger.info(
+      `Deleting Logto user ${logtoUserId} because linked aMember user ${amemberUserId} was ${reason}`
+    );
+    await revokeRolesForUser(logtoUserId);
+    await context.deleteLogtoUserFromAMember(logtoUserId);
+    stats.usersDeleted += 1;
+    userIndexes.byAMemberUserId.delete(amemberUserId);
+  };
+
+  if (config.deleteLogtoUsersWhenRemovedFromAMember) {
+    for (const [amemberUserId, logtoUser] of userIndexes.byAMemberUserId) {
+      if (activeAMemberUserIds.has(amemberUserId)) {
+        continue;
+      }
+
+      await deleteLogtoUserForRemovedAMemberAccount(
+        logtoUser.id,
+        amemberUserId,
+        seenAMemberUserIds.has(amemberUserId) ? 'inactive' : 'removed'
+      );
+    }
+  } else {
+    for (const amemberUserId of logtoUserIdByAMemberUserId.keys()) {
+      if (activeAMemberUserIds.has(amemberUserId)) {
+        continue;
+      }
+
+      const logtoUserId = logtoUserIdByAMemberUserId.get(amemberUserId);
+
+      if (logtoUserId) {
+        await revokeRolesForUser(logtoUserId);
+      }
     }
 
-    const logtoUserId = logtoUserIdByAMemberUserId.get(amemberUserId);
+    for (const [amemberUserId, logtoUser] of userIndexes.byAMemberUserId) {
+      if (activeAMemberUserIds.has(amemberUserId) || accessByUserId.has(amemberUserId)) {
+        continue;
+      }
 
-    if (logtoUserId) {
-      await revokeRolesForUser(logtoUserId);
+      await revokeRolesForUser(logtoUser.id);
     }
-  }
-
-  for (const [amemberUserId, logtoUser] of userIndexes.byAMemberUserId) {
-    if (activeAMemberUserIds.has(amemberUserId) || accessByUserId.has(amemberUserId)) {
-      continue;
-    }
-
-    await revokeRolesForUser(logtoUser.id);
   }
 
   logger.info(
-    `aMember sync complete: ${stats.productsCreated} roles created, ${stats.productsUpdated} updated, ${stats.productsDeleted} deleted, ${stats.usersCreated} users created, ${stats.usersUpdated} updated, ${stats.usersSkipped} skipped, ${stats.roleAssignmentsAdded} role assignments added, ${stats.roleAssignmentsRemoved} removed, ${stats.rolesRevokedDueToInactivity} revoked due to inactivity`
+    `aMember sync complete: ${stats.productsCreated} roles created, ${stats.productsUpdated} updated, ${stats.productsDeleted} deleted, ${stats.usersCreated} users created, ${stats.usersUpdated} updated, ${stats.usersSkipped} skipped, ${stats.usersDeleted} deleted, ${stats.roleAssignmentsAdded} role assignments added, ${stats.roleAssignmentsRemoved} removed, ${stats.rolesRevokedDueToInactivity} revoked due to inactivity`
   );
 
   return stats;

@@ -28,6 +28,21 @@ describe('createAMemberApiClient', () => {
 });
 
 describe('createApiAMemberDataSink', () => {
+  it('finds an existing user by login or email', async () => {
+    scope()
+      .get('/amember/api/users')
+      .query({ _key: apiKey, '_filter[login]': 'jane@example.com' })
+      .reply(200, { _items: [{ user_id: 77, login: 'jane@example.com' }] });
+
+    const sink = createApiAMemberDataSink({ apiUrl, apiKey });
+    const userId = await sink.findUserByLoginOrEmail({
+      login: 'jane@example.com',
+      email: 'jane@example.com',
+    });
+
+    expect(userId).toBe(77);
+  });
+
   it('creates a user when aMember returns user_id', async () => {
     scope()
       .post('/amember/api/users', (body) => body.login === 'jane@example.com')

@@ -10,10 +10,10 @@ import {
   builtInCustomProfileFieldKeys,
   nameAndAvatarGuard,
   reservedBuiltInProfileKeyGuard,
+  CustomProfileFieldType,
 } from '@logto/schemas';
 
 import RequestError from '#src/errors/RequestError/index.js';
-import { resolveSignUpCustomProfileFields } from '#src/libraries/custom-profile-fields/utils.js';
 import type Queries from '#src/tenants/Queries.js';
 import assertThat from '#src/utils/assert-that.js';
 
@@ -213,17 +213,8 @@ export class ProfileValidator {
    *   When true, only required fields are enforced; optional fields can be skipped.
    */
   public async hasMissingExtraProfileFields(profile: InteractionProfile, user?: User) {
-    const [allCustomProfileFields, signInExperience] = await Promise.all([
-      this.queries.customProfileFields.findAllCustomProfileFields(),
-      this.signInExperienceValidator.getSignInExperienceData(),
-    ]);
-
-    // Resolve which fields are relevant for sign-up. The helper owns the dev-feature and
-    // null/undefined fallback logic; explicit arrays narrow the catalog to a sign-up subset.
-    const customProfileFields = resolveSignUpCustomProfileFields(
-      allCustomProfileFields,
-      signInExperience.signUpProfileFields
-    );
+    const customProfileFields =
+      await this.signInExperienceValidator.resolveSignUpCustomProfileFieldsForRegister();
 
     // Return false early if there are no custom profile fields to collect
     if (customProfileFields.length === 0) {
@@ -241,6 +232,16 @@ export class ProfileValidator {
       if (currentField.name === 'fullname') {
         return [...accumulator, ...(currentField.config.parts?.map(({ name }) => name) ?? [])];
       }
+
+      if (currentField.type === CustomProfileFieldType.Address) {
+        return [
+          ...accumulator,
+          ...(currentField.config.parts
+            ?.filter(({ enabled }) => enabled !== false)
+            .map(({ name }) => name) ?? []),
+        ];
+      }
+
       return [...accumulator, currentField.name];
     }, new Array<string>());
 
@@ -248,10 +249,12 @@ export class ProfileValidator {
       const foundInUser =
         this.hasField(user, name) ||
         this.hasField(user?.profile, name) ||
+        this.hasField(user?.profile?.address, name) ||
         this.hasField(user?.customData, name);
       const foundInProfile =
         this.hasField(profile, name) ||
         this.hasField(profile.profile, name) ||
+        this.hasField(profile.profile?.address, name) ||
         this.hasField(profile.customData, name);
 
       if (!foundInUser && !foundInProfile) {

@@ -68,6 +68,7 @@ export const amemberSyncConfigGuard = z
     tenantId: z.string().min(1),
     intervalSeconds: z.number().int().positive(),
     syncPasswords: z.boolean().default(true),
+    deleteLogtoUsersWhenRemovedFromAMember: z.boolean().default(false),
     inboundMode: amemberSyncModeGuard,
     tablePrefix: z.string().default('am_'),
     apiUrl: z.string().url().optional(),
@@ -182,6 +183,7 @@ export const toAMemberSyncRuntimeConfig = (
     tenantId,
     intervalSeconds: stored.intervalSeconds,
     syncPasswords: stored.syncPasswords,
+    deleteLogtoUsersWhenRemovedFromAMember: stored.deleteLogtoUsersWhenRemovedFromAMember,
     inboundMode,
     tablePrefix: stored.tablePrefix,
     apiUrl: stored.apiUrl,
@@ -203,6 +205,7 @@ export type AMemberSyncStats = {
   usersCreated: number;
   usersUpdated: number;
   usersSkipped: number;
+  usersDeleted: number;
   roleAssignmentsAdded: number;
   roleAssignmentsRemoved: number;
   rolesRevokedDueToInactivity: number;

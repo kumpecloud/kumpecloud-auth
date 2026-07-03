@@ -3,10 +3,11 @@ import {
   pushLogtoRoleGrantsToAMember,
   pushLogtoUserToAMember,
   resolveAMemberOutboundConfig,
+  validateAMemberOutboundUserProfile,
   type AMemberOutboundPushUser,
   type AMemberSyncLogger,
 } from '@logto/plugin-amember-sync';
-import { amemberSyncStoredConfigGuard, type JsonObject, type User } from '@logto/schemas';
+import { amemberSyncStoredConfigGuard, type JsonObject, type User, type UserProfile } from '@logto/schemas';
 import { ConsoleLog } from '@logto/shared';
 import chalk from 'chalk';
 
@@ -79,6 +80,7 @@ type AMemberUserCreateInput = {
   password?: string;
   passwordEncrypted?: string;
   plainPassword?: string;
+  profile?: UserProfile | null;
 };
 
 export const validateAMemberOutboundUserCreateInput = async (
@@ -111,6 +113,13 @@ export const validateAMemberOutboundUserCreateInput = async (
   if (!hasPassword) {
     throw new RequestError({
       code: 'user.amember_password_required',
+      status: 422,
+    });
+  }
+
+  if (validateAMemberOutboundUserProfile(input.profile).length > 0) {
+    throw new RequestError({
+      code: 'user.amember_profile_required',
       status: 422,
     });
   }

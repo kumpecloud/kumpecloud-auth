@@ -65,6 +65,8 @@ const user = {
     'Username is required because aMember outbound sync is enabled.',
   amember_password_required:
     'Password is required because aMember outbound sync is enabled.',
+  amember_profile_required:
+    'First name, last name, date of birth, and full address are required because aMember outbound sync is enabled.',
 };
 
 export default Object.freeze(user);

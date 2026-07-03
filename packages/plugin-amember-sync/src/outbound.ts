@@ -9,7 +9,7 @@ import {
 } from './profile-fields.js';
 import { createApiAMemberDataSink, type AMemberDataSink } from './sinks/api-sink.js';
 import { isRoleOutboundSyncEnabled, type AMemberOutboundConfig, type AMemberSyncLogger } from './types.js';
-import { getAMemberUserIdFromCustomData } from './utils.js';
+import { assertAMemberOutboundUserProfile } from './sign-up-requirements.js';
 
 export type AMemberOutboundPushUser = LogtoUserForAMemberOutbound & {
   id: string;
@@ -27,6 +27,111 @@ const createSink = (config: AMemberOutboundConfig): AMemberDataSink => {
   });
 };
 
+/** Prevents concurrent outbound provisioning from creating duplicate aMember users. */
+const pendingUserProvisioning = new Map<string, Promise<number>>();
+
+const linkLogtoUserToAMember = async ({
+  user,
+  amemberUserId,
+  context,
+  logger,
+  message,
+}: {
+  user: AMemberOutboundPushUser;
+  amemberUserId: number;
+  context: AMemberOutboundContext;
+  logger: AMemberSyncLogger;
+  message: string;
+}) => {
+  const customData = setAMemberLinkage(user.customData ?? {}, amemberUserId);
+
+  await context.updateUserCustomData(user.id, customData);
+  logger.info(message);
+
+  return amemberUserId;
+};
+
+const resolveExistingAMemberUserId = async ({
+  user,
+  sink,
+  plainPassword,
+}: {
+  user: AMemberOutboundPushUser;
+  sink: AMemberDataSink;
+  plainPassword?: string;
+}) => {
+  const linkedId = getAMemberUserIdFromCustomData(user.customData ?? {});
+
+  if (linkedId !== undefined) {
+    return linkedId;
+  }
+
+  const fields = buildLogtoUserToAMemberFields(user, { plainPassword });
+
+  return sink.findUserByLoginOrEmail({
+    login: fields.login,
+    email: fields.email,
+  });
+};
+
+const provisionAMemberUserId = async ({
+  user,
+  sink,
+  plainPassword,
+  context,
+  logger,
+}: {
+  user: AMemberOutboundPushUser;
+  sink: AMemberDataSink;
+  plainPassword?: string;
+  context: AMemberOutboundContext;
+  logger: AMemberSyncLogger;
+}): Promise<number> => {
+  const existingId = await resolveExistingAMemberUserId({ user, sink, plainPassword });
+
+  if (existingId !== undefined) {
+    return linkLogtoUserToAMember({
+      user,
+      amemberUserId: existingId,
+      context,
+      logger,
+      message: `Linked Logto user ${user.id} to existing aMember user ${existingId}`,
+    });
+  }
+
+  const fields = buildLogtoUserToAMemberFields(user, { plainPassword });
+  assertAMemberOutboundUserProfile(user.profile);
+
+  try {
+    const createdId = await sink.createUser(fields);
+
+    return linkLogtoUserToAMember({
+      user,
+      amemberUserId: createdId,
+      context,
+      logger,
+      message: `Created aMember user ${createdId} for Logto user ${user.id}`,
+    });
+  } catch (error: unknown) {
+    const recoveredId = await sink.findUserByLoginOrEmail({
+      login: fields.login,
+      email: fields.email,
+    });
+
+    if (recoveredId === undefined) {
+      throw error;
+    }
+
+    return linkLogtoUserToAMember({
+      user,
+      amemberUserId: recoveredId,
+      context,
+      logger,
+      message: `Recovered aMember linkage for Logto user ${user.id} as user ${recoveredId}`,
+    });
+  }
+};
+
 const resolveAMemberUserId = async ({
   user,
   sink,
@@ -40,20 +145,27 @@ const resolveAMemberUserId = async ({
   context: AMemberOutboundContext;
   logger: AMemberSyncLogger;
 }): Promise<number> => {
-  const existingId = getAMemberUserIdFromCustomData(user.customData ?? {});
+  const pending = pendingUserProvisioning.get(user.id);
 
-  if (existingId !== undefined) {
-    return existingId;
+  if (pending) {
+    return pending;
   }
 
-  const fields = buildLogtoUserToAMemberFields(user, { plainPassword });
-  const createdId = await sink.createUser(fields);
-  const customData = setAMemberLinkage(user.customData ?? {}, createdId);
+  const task = provisionAMemberUserId({
+    user,
+    sink,
+    plainPassword,
+    context,
+    logger,
+  });
 
-  await context.updateUserCustomData(user.id, customData);
-  logger.info(`Created aMember user ${createdId} for Logto user ${user.id}`);
+  pendingUserProvisioning.set(user.id, task);
 
-  return createdId;
+  try {
+    return await task;
+  } finally {
+    pendingUserProvisioning.delete(user.id);
+  }
 };
 
 export const pushLogtoUserToAMember = async ({
@@ -82,6 +194,7 @@ export const pushLogtoUserToAMember = async ({
   const fields = buildLogtoUserToAMemberFields(user, { plainPassword });
 
   if (hadLinkedAMemberUser) {
+    assertAMemberOutboundUserProfile(user.profile);
     await sink.updateUser(amemberUserId, fields);
   } else if (plainPassword) {
     await sink.updateUser(amemberUserId, { pass: plainPassword });

@@ -1,6 +1,7 @@
 import { GoogleConnector } from '@logto/connector-kit';
 import {
   applyAMemberOutboundSignUpRequirements,
+  applyAMemberOutboundSignUpProfileFields,
   resolveAMemberOutboundConfig,
 } from '@logto/plugin-amember-sync';
 import { builtInLanguages } from '@logto/phrases-experience';
@@ -329,9 +330,22 @@ export const createSignInExperienceLibrary = (
     // Resolve helper owns the dev-feature and null/undefined fallback logic. Explicit arrays
     // expose and order only the selected sign-up fields; otherwise the full `sie_order` catalog
     // is preserved for legacy behavior.
+    const outboundStored =
+      (await getAMemberSyncConfig()) ??
+      amemberSyncStoredConfigGuard.parse({ enabled: false });
+    const outboundEnabled = Boolean(resolveAMemberOutboundConfig(tenantId, outboundStored));
+    const { catalog: signUpProfileFieldCatalog, signUpProfileFields } = outboundEnabled
+      ? applyAMemberOutboundSignUpProfileFields(
+          customProfileFields,
+          signInExperience.signUpProfileFields
+        )
+      : {
+          catalog: customProfileFields,
+          signUpProfileFields: signInExperience.signUpProfileFields,
+        };
     const signUpCustomProfileFields = resolveSignUpCustomProfileFields(
-      customProfileFields,
-      signInExperience.signUpProfileFields
+      signUpProfileFieldCatalog,
+      signUpProfileFields
     );
 
     const mergedExperience = deepmerge<SignInExperience, SignInExperienceOverride>(
@@ -343,7 +357,7 @@ export const createSignInExperienceLibrary = (
     );
 
     const stored =
-      (await getAMemberSyncConfig()) ??
+      outboundStored ??
       amemberSyncStoredConfigGuard.parse({ enabled: false });
     const signUp = resolveAMemberOutboundConfig(tenantId, stored)
       ? applyAMemberOutboundSignUpRequirements(mergedExperience.signUp)
@@ -359,7 +373,7 @@ export const createSignInExperienceLibrary = (
       googleOneTap: getGoogleOneTap(),
       captchaConfig: await getCaptchaConfig(),
       customProfileFields: signUpCustomProfileFields,
-      customProfileFieldCatalog: customProfileFields,
+      customProfileFieldCatalog: signUpProfileFieldCatalog,
     };
   };
 

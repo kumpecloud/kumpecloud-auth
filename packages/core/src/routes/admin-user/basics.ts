@@ -290,6 +290,7 @@ export default function adminUserBasicsRoutes<T extends ManagementApiRouter>(
         primaryEmail,
         password,
         passwordEncrypted: passwordDigest,
+        profile,
       });
 
       const id = await generateUserId();

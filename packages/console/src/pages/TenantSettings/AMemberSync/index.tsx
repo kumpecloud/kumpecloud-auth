@@ -26,6 +26,7 @@ type FormData = {
   inboundMode: 'api' | 'database';
   intervalSeconds: number;
   syncPasswords: boolean;
+  deleteLogtoUsersWhenRemovedFromAMember: boolean;
   tablePrefix: string;
   apiUrl: string;
   apiKey: string;
@@ -45,6 +46,7 @@ const defaultFormData: FormData = {
   inboundMode: 'database',
   intervalSeconds: 3600,
   syncPasswords: true,
+  deleteLogtoUsersWhenRemovedFromAMember: false,
   tablePrefix: 'am_',
   apiUrl: '',
   apiKey: '',
@@ -63,6 +65,9 @@ const toFormData = (data?: AMemberSyncConfigResponse): FormData => ({
   inboundMode: data?.inboundMode ?? defaultFormData.inboundMode,
   intervalSeconds: data?.intervalSeconds ?? defaultFormData.intervalSeconds,
   syncPasswords: data?.syncPasswords ?? defaultFormData.syncPasswords,
+  deleteLogtoUsersWhenRemovedFromAMember:
+    data?.deleteLogtoUsersWhenRemovedFromAMember ??
+    defaultFormData.deleteLogtoUsersWhenRemovedFromAMember,
   tablePrefix: data?.tablePrefix ?? defaultFormData.tablePrefix,
   apiUrl: data?.apiUrl ?? defaultFormData.apiUrl,
   databaseHost: data?.databaseHost ?? defaultFormData.databaseHost,
@@ -148,6 +153,7 @@ function AMemberSyncSettings() {
         inboundMode: formData.inboundMode,
         intervalSeconds: Number(formData.intervalSeconds),
         syncPasswords: formData.syncPasswords,
+        deleteLogtoUsersWhenRemovedFromAMember: formData.deleteLogtoUsersWhenRemovedFromAMember,
         tablePrefix: formData.tablePrefix,
         apiUrl: formData.apiUrl || undefined,
         apiKey: formData.apiKey || undefined,
@@ -260,6 +266,12 @@ function AMemberSyncSettings() {
                   )}
                 />
               </FormField>
+              <FormField title="tenants.amember_sync.delete_logto_users_when_removed">
+                <Switch {...register('deleteLogtoUsersWhenRemovedFromAMember')} />
+              </FormField>
+              <p className={styles.hint}>
+                <DynamicT forKey="tenants.amember_sync.delete_logto_users_when_removed_hint" />
+              </p>
 
               {isDatabaseInbound ? (
                 <>
