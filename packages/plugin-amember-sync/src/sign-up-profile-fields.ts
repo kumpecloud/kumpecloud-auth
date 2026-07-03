@@ -94,27 +94,31 @@ const createAddressField = (): AddressProfileField => ({
 });
 
 /** Default sign-up profile fields required for aMember outbound sync. */
-export const createAMemberOutboundDefaultProfileFields = (): CustomProfileFieldUnion[] => [
-  createFullnameField(),
-  createBirthdateField(),
-  createAddressField(),
-];
+export const createAMemberOutboundDefaultProfileFields = (): Array<
+  FullnameProfileField | DateProfileField | AddressProfileField
+> => [createFullnameField(), createBirthdateField(), createAddressField()];
 
 const ensureOutboundRequiredField = (
   catalogByName: Map<string, CustomProfileFieldUnion>,
-  field: CustomProfileFieldUnion
+  field: FullnameProfileField | DateProfileField | AddressProfileField
 ) => {
   const existing = catalogByName.get(field.name);
 
   if (!existing) {
-    catalogByName.set(field.name, field);
+    catalogByName.set(field.name, { ...field, required: true });
     return;
   }
 
+  const label = existing.label ?? field.label;
+  const description =
+    'description' in existing && existing.description !== undefined
+      ? existing.description
+      : field.description;
+
   catalogByName.set(field.name, {
     ...field,
-    label: existing.label ?? field.label,
-    description: existing.description ?? field.description,
+    label,
+    ...(description !== undefined ? { description } : {}),
     required: true,
   });
 };

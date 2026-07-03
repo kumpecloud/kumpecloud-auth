@@ -10,6 +10,7 @@ import {
 import { createApiAMemberDataSink, type AMemberDataSink } from './sinks/api-sink.js';
 import { isRoleOutboundSyncEnabled, type AMemberOutboundConfig, type AMemberSyncLogger } from './types.js';
 import { assertAMemberOutboundUserProfile } from './sign-up-requirements.js';
+import { getAMemberUserIdFromCustomData } from './utils.js';
 
 export type AMemberOutboundPushUser = LogtoUserForAMemberOutbound & {
   id: string;
