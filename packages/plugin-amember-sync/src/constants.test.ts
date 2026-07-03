@@ -7,14 +7,19 @@ import {
 } from './constants.js';
 import { buildAMemberCustomData, buildAMemberUserProfile } from './profile-fields.js';
 import {
+  applyAMemberUserDeletionSignals,
   buildAMemberSuspensionUpdate,
   isAccessActive,
   isAMemberUserActive,
+  isDeletedUserLogin,
   normalizeAMemberDateString,
   resolveAMemberPasswordImport,
   resolveAMemberPrimaryPhone,
   resolveAMemberUserEmail,
   resolveAMemberUserIdentity,
+  shouldDeleteLogtoUserForAMemberState,
+  shouldProvisionLogtoUserFromAMember,
+  shouldSyncAMemberProductRolesForUser,
 } from './utils.js';
 
 describe('aMember role naming', () => {
@@ -291,6 +296,100 @@ describe('aMember user activity', () => {
 
   it('treats locked users as active for role assignment sync', () => {
     expect(isAMemberUserActive({ userId: 1, login: 'a', isLocked: true })).toBe(true);
+  });
+});
+
+describe('aMember Logto user lifecycle', () => {
+  it('detects deleted-user login prefixes', () => {
+    expect(isDeletedUserLogin('deleted-user-123')).toBe(true);
+    expect(isDeletedUserLogin('Deleted-User-abc')).toBe(true);
+    expect(isDeletedUserLogin('member')).toBe(false);
+  });
+
+  it('marks deleted-user logins as deleted', () => {
+    expect(
+      applyAMemberUserDeletionSignals({ userId: 1, login: 'deleted-user-9' }).isDeleted
+    ).toBe(true);
+  });
+
+  it('does not provision deleted or inactive users', () => {
+    expect(
+      shouldProvisionLogtoUserFromAMember({ userId: 1, login: 'deleted-user-1' })
+    ).toBe(false);
+    expect(
+      shouldProvisionLogtoUserFromAMember({ userId: 1, login: 'member', isDeleted: true })
+    ).toBe(false);
+    expect(
+      shouldProvisionLogtoUserFromAMember({ userId: 1, login: 'member', status: 2 })
+    ).toBe(false);
+    expect(shouldProvisionLogtoUserFromAMember({ userId: 1, login: 'member', status: 1 })).toBe(
+      true
+    );
+  });
+
+  it('keeps suspended, pending, inactive, and expired users while deleting removed accounts', () => {
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        amemberUser: { userId: 1, login: 'member', isLocked: true, status: 2 },
+        existsInAMember: true,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        amemberUser: { userId: 1, login: 'member', status: 1 },
+        existsInAMember: true,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        amemberUser: { userId: 1, login: 'member', status: 2 },
+        existsInAMember: true,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        amemberUser: { userId: 1, login: 'member', status: 'expired' },
+        existsInAMember: true,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        amemberUser: { userId: 1, login: 'deleted-user-1' },
+        existsInAMember: true,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        amemberUser: { userId: 1, login: 'member', isDeleted: true },
+        existsInAMember: true,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldDeleteLogtoUserForAMemberState({
+        existsInAMember: false,
+      })
+    ).toBe(true);
+  });
+
+  it('syncs product roles for active and suspended users only', () => {
+    expect(shouldSyncAMemberProductRolesForUser({ userId: 1, login: 'member', status: 1 })).toBe(
+      true
+    );
+    expect(
+      shouldSyncAMemberProductRolesForUser({ userId: 1, login: 'member', status: 2, isLocked: true })
+    ).toBe(true);
+    expect(shouldSyncAMemberProductRolesForUser({ userId: 1, login: 'member', status: 2 })).toBe(
+      false
+    );
+    expect(
+      shouldSyncAMemberProductRolesForUser({ userId: 1, login: 'deleted-user-1', status: 1 })
+    ).toBe(false);
   });
 });
 

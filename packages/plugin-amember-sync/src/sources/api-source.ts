@@ -1,7 +1,7 @@
 import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
 import { parseAMemberUserProfileFields } from '../profile-fields.js';
-import { buildAMemberUserName, isTruthyFlag } from '../utils.js';
+import { applyAMemberUserDeletionSignals, buildAMemberUserName, isTruthyFlag } from '../utils.js';
 
 import { readAMemberJsonResponse } from '../sinks/api-response.js';
 import { createAMemberApiClient } from '../sinks/amember-api-client.js';
@@ -105,7 +105,7 @@ const mapUser = (raw: RawUser): AMemberUser | undefined => {
   const name = buildAMemberUserName(raw.name_f, raw.name_l);
   const profile = parseAMemberUserProfileFields(raw as Record<string, unknown>);
 
-  return {
+  return applyAMemberUserDeletionSignals({
     userId,
     login,
     email: raw.email?.trim(),
@@ -116,7 +116,7 @@ const mapUser = (raw: RawUser): AMemberUser | undefined => {
     name,
     ...profile,
     isDeleted: isTruthyFlag(raw.deleted ?? raw.is_deleted),
-  };
+  });
 };
 
 const mapAccess = (raw: RawAccess): AMemberAccess | undefined => {

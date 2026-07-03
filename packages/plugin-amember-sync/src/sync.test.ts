@@ -90,7 +90,7 @@ describe('runAMemberSync deleteLogtoUsersWhenRemovedFromAMember', () => {
     expect(stats.usersDeleted).toBe(0);
   });
 
-  it('deletes linked Logto users when aMember marks them inactive and the toggle is on', async () => {
+  it('deletes linked Logto users when aMember marks them deleted and the toggle is on', async () => {
     const context = createContext();
     sourceMocks.getUsers.mockResolvedValue([
       {
@@ -123,5 +123,159 @@ describe('runAMemberSync deleteLogtoUsersWhenRemovedFromAMember', () => {
 
     expect(context.deleteLogtoUserFromAMember).toHaveBeenCalledWith('logto-42');
     expect(stats.usersDeleted).toBe(1);
+  });
+
+  it('does not create deleted-user or inactive aMember accounts in Logto', async () => {
+    const context = createContext();
+    sourceMocks.getUsers.mockResolvedValue([
+      {
+        userId: 99,
+        login: 'deleted-user-99',
+        email: 'removed@example.com',
+      },
+      {
+        userId: 100,
+        login: 'inactive-user',
+        email: 'inactive@example.com',
+        status: 2,
+      },
+    ]);
+
+    const stats = await runAMemberSync({
+      config: baseConfig,
+      context,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    expect(context.createUserFromAMember).not.toHaveBeenCalled();
+    expect(context.updateUserFromAMember).not.toHaveBeenCalled();
+    expect(stats.usersCreated).toBe(0);
+    expect(stats.usersSkipped).toBe(2);
+  });
+
+  it('keeps inactive and expired users in Logto when the toggle is on', async () => {
+    const context = createContext();
+    sourceMocks.getUsers.mockResolvedValue([
+      {
+        userId: 42,
+        login: 'user42',
+        email: 'user@example.com',
+        status: 2,
+      },
+      {
+        userId: 43,
+        login: 'expired-user',
+        email: 'expired@example.com',
+        status: 'expired',
+      },
+    ]);
+    context.findUsersIndexed.mockResolvedValue({
+      byEmail: new Map(),
+      byUsername: new Map(),
+      byAMemberUserId: new Map([
+        [
+          42,
+          {
+            id: 'logto-42',
+            primaryEmail: 'user@example.com',
+            username: 'user42',
+            customData: { amember: { userId: 42 } },
+          },
+        ],
+        [
+          43,
+          {
+            id: 'logto-43',
+            primaryEmail: 'expired@example.com',
+            username: 'expired-user',
+            customData: { amember: { userId: 43 } },
+          },
+        ],
+      ]),
+    });
+
+    const stats = await runAMemberSync({
+      config: { ...baseConfig, deleteLogtoUsersWhenRemovedFromAMember: true },
+      context,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    expect(context.deleteLogtoUserFromAMember).not.toHaveBeenCalled();
+    expect(context.syncUserAMemberRoles).toHaveBeenCalledWith('logto-42', [], expect.any(Map));
+    expect(context.syncUserAMemberRoles).toHaveBeenCalledWith('logto-43', [], expect.any(Map));
+    expect(stats.usersDeleted).toBe(0);
+  });
+
+  it('deletes existing Logto users for deleted-user logins when the toggle is on', async () => {
+    const context = createContext();
+    sourceMocks.getUsers.mockResolvedValue([
+      {
+        userId: 42,
+        login: 'deleted-user-42',
+        email: 'user@example.com',
+      },
+    ]);
+
+    const stats = await runAMemberSync({
+      config: { ...baseConfig, deleteLogtoUsersWhenRemovedFromAMember: true },
+      context,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    expect(context.createUserFromAMember).not.toHaveBeenCalled();
+    expect(context.deleteLogtoUserFromAMember).toHaveBeenCalledWith('logto-42');
+    expect(stats.usersDeleted).toBe(1);
+  });
+
+  it('keeps pending users without access and suspended users when the toggle is on', async () => {
+    const context = createContext();
+    context.findUsersIndexed.mockResolvedValue({
+      byEmail: new Map(),
+      byUsername: new Map(),
+      byAMemberUserId: new Map([
+        [
+          7,
+          {
+            id: 'logto-7',
+            primaryEmail: 'pending@example.com',
+            username: 'pending',
+            customData: { amember: { userId: 7 } },
+          },
+        ],
+        [
+          8,
+          {
+            id: 'logto-8',
+            primaryEmail: 'locked@example.com',
+            username: 'locked',
+            customData: { amember: { userId: 8 } },
+          },
+        ],
+      ]),
+    });
+    sourceMocks.getUsers.mockResolvedValue([
+      {
+        userId: 7,
+        login: 'pending',
+        email: 'pending@example.com',
+        status: 1,
+      },
+      {
+        userId: 8,
+        login: 'locked',
+        email: 'locked@example.com',
+        status: 2,
+        isLocked: true,
+      },
+    ]);
+
+    const stats = await runAMemberSync({
+      config: { ...baseConfig, deleteLogtoUsersWhenRemovedFromAMember: true },
+      context,
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    expect(context.deleteLogtoUserFromAMember).not.toHaveBeenCalled();
+    expect(stats.usersDeleted).toBe(0);
   });
 });

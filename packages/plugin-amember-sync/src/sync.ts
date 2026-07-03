@@ -6,9 +6,12 @@ import {
   getAMemberUserIdFromCustomData,
   groupActiveAccessByUserId,
   indexProductsById,
-  isAMemberUserActive,
   resolveAMemberUserIdentity,
+  shouldDeleteLogtoUserForAMemberState,
+  shouldProvisionLogtoUserFromAMember,
+  shouldSyncAMemberProductRolesForUser,
   truncateRoleDescription,
+  applyAMemberUserDeletionSignals,
 } from './utils.js';
 
 const emptyStats = (): AMemberSyncStats => ({
@@ -124,15 +127,24 @@ export const runAMemberSync = async ({
 
   logger.info(`Syncing ${users.length} aMember users...`);
   const userIndexes = await context.findUsersIndexed();
+  const usersById = new Map<number, AMemberUser>();
   const logtoUserIdByAMemberUserId = new Map<number, string>();
-  const seenAMemberUserIds = new Set<number>();
 
-  for (const user of users) {
-    seenAMemberUserIds.add(user.userId);
+  for (const rawUser of users) {
+    const user = applyAMemberUserDeletionSignals(rawUser);
+    usersById.set(user.userId, user);
     const identity = resolveAMemberUserIdentity(user);
 
     if (!identity || (!identity.email && !identity.username)) {
       logger.warn(`Skipping aMember user ${user.userId}: no usable login, email, or username`);
+      stats.usersSkipped += 1;
+      continue;
+    }
+
+    if (!shouldProvisionLogtoUserFromAMember(user)) {
+      logger.info(
+        `Skipping Logto provisioning for aMember user ${user.userId}: deleted, inactive, or removed-account login`
+      );
       stats.usersSkipped += 1;
       continue;
     }
@@ -159,7 +171,7 @@ export const runAMemberSync = async ({
       stats.usersUpdated += 1;
     }
 
-    if (isAMemberUserActive(user)) {
+    if (shouldSyncAMemberProductRolesForUser(user)) {
       activeAMemberUserIds.add(user.userId);
     }
   }
@@ -205,15 +217,24 @@ export const runAMemberSync = async ({
 
   if (config.deleteLogtoUsersWhenRemovedFromAMember) {
     for (const [amemberUserId, logtoUser] of userIndexes.byAMemberUserId) {
-      if (activeAMemberUserIds.has(amemberUserId)) {
+      const amemberUser = usersById.get(amemberUserId);
+      const shouldDelete = shouldDeleteLogtoUserForAMemberState({
+        amemberUser,
+        existsInAMember: usersById.has(amemberUserId),
+      });
+
+      if (shouldDelete) {
+        await deleteLogtoUserForRemovedAMemberAccount(
+          logtoUser.id,
+          amemberUserId,
+          usersById.has(amemberUserId) ? 'inactive' : 'removed'
+        );
         continue;
       }
 
-      await deleteLogtoUserForRemovedAMemberAccount(
-        logtoUser.id,
-        amemberUserId,
-        seenAMemberUserIds.has(amemberUserId) ? 'inactive' : 'removed'
-      );
+      if (amemberUser && !shouldSyncAMemberProductRolesForUser(amemberUser)) {
+        await revokeRolesForUser(logtoUser.id);
+      }
     }
   } else {
     for (const amemberUserId of logtoUserIdByAMemberUserId.keys()) {
@@ -229,7 +250,13 @@ export const runAMemberSync = async ({
     }
 
     for (const [amemberUserId, logtoUser] of userIndexes.byAMemberUserId) {
-      if (activeAMemberUserIds.has(amemberUserId) || accessByUserId.has(amemberUserId)) {
+      const amemberUser = usersById.get(amemberUserId);
+
+      if (
+        activeAMemberUserIds.has(amemberUserId) ||
+        accessByUserId.has(amemberUserId) ||
+        amemberUser?.isLocked
+      ) {
         continue;
       }
 
