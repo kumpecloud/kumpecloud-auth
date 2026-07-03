@@ -100,7 +100,13 @@ pnpm cli amember sync
 pnpm cli amember sync --tenant default
 ```
 
-**Manual (API):** `POST /api/configs/amember-sync/run`
+**Manual (API):**
+
+- `POST /api/configs/amember-sync/run` — full tenant inbound sync (Management API)
+- `POST /api/users/{userId}/amember-sync` — sync one user's aMember access to Logto roles (Management API)
+- `POST /api/my-account/amember-sync` — sync the authenticated user's aMember access to Logto roles (User API; requires `roles` scope)
+
+Use the per-user endpoints after granting access directly in aMember so users receive Logto product roles without waiting for the scheduled inbound sync.
 
 ## aMember API permissions (outbound)
 

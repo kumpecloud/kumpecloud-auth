@@ -51,3 +51,12 @@ export const amemberSyncConfigResponseGuard = amemberSyncStoredConfigGuard
   });
 
 export type AMemberSyncConfigResponse = z.infer<typeof amemberSyncConfigResponseGuard>;
+
+export const amemberUserSyncStatsGuard = z.object({
+  amemberUserId: z.number().int().positive(),
+  productIds: z.number().int().positive().array(),
+  roleAssignmentsAdded: z.number().int().nonnegative(),
+  roleAssignmentsRemoved: z.number().int().nonnegative(),
+});
+
+export type AMemberUserSyncStatsResponse = z.infer<typeof amemberUserSyncStatsGuard>;

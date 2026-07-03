@@ -1,0 +1,22 @@
+{
+  "paths": {
+    "/api/users/{userId}/amember-sync": {
+      "post": {
+        "operationId": "SyncUserAMemberAccess",
+        "summary": "Sync aMember access for user",
+        "description": "Pull a user's active aMember access records and update their Logto product role assignments immediately. Use this after granting access in aMember so the user does not need to wait for the scheduled inbound sync.",
+        "responses": {
+          "200": {
+            "description": "aMember access was synced successfully."
+          },
+          "404": {
+            "description": "The Logto user or matching aMember user was not found."
+          },
+          "503": {
+            "description": "Inbound aMember sync is not configured or the database connection failed."
+          }
+        }
+      }
+    }
+  }
+}
