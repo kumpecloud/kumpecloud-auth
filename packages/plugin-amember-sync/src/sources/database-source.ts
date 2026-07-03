@@ -4,7 +4,11 @@ import type { AMemberAccess, AMemberProduct, AMemberUser } from '../types.js';
 import type { AMemberDataSource } from '../context.js';
 import { connectAMemberDatabase } from '../mysql-connection.js';
 import { parseAMemberUserProfileFields, resolveDatabaseUserSelectColumns } from '../profile-fields.js';
-import { buildAMemberUserName, normalizeAMemberDateString } from '../utils.js';
+import {
+  applyAMemberUserDeletionSignals,
+  buildAMemberUserName,
+  normalizeAMemberDateString,
+} from '../utils.js';
 
 type DatabaseRow = Record<string, unknown>;
 
@@ -72,7 +76,7 @@ export const createDatabaseAMemberDataSource = ({
 
     const profile = parseAMemberUserProfileFields(row);
 
-    return {
+    return applyAMemberUserDeletionSignals({
       userId,
       login,
       email: toString(row.email)?.trim(),
@@ -81,7 +85,7 @@ export const createDatabaseAMemberDataSource = ({
       mobileNumber: toString(row.mobile_number)?.trim(),
       name: buildAMemberUserName(profile.nameF, profile.nameL),
       ...profile,
-    };
+    });
   };
 
   const mapAccessRow = (row: DatabaseRow): AMemberAccess | undefined => {

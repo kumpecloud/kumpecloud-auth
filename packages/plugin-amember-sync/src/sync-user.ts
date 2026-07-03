@@ -4,9 +4,10 @@ import { parseProductIdFromRoleName } from './constants.js';
 import type { AMemberDataSource, AMemberSyncContext } from './context.js';
 import type { AMemberSyncConfig, AMemberSyncLogger, AMemberUser } from './types.js';
 import {
+  applyAMemberUserDeletionSignals,
   getAMemberUserIdFromCustomData,
   isAccessActive,
-  isAMemberUserActive,
+  shouldSyncAMemberProductRolesForUser,
   truncateRoleDescription,
 } from './utils.js';
 
@@ -44,7 +45,10 @@ const resolveAMemberUser = async ({
     const amemberUser = await source.getUserById(linkedUserId);
 
     if (amemberUser) {
-      return { amemberUserId: linkedUserId, amemberUser };
+      return {
+        amemberUserId: linkedUserId,
+        amemberUser: applyAMemberUserDeletionSignals(amemberUser),
+      };
     }
   }
 
@@ -57,7 +61,10 @@ const resolveAMemberUser = async ({
     return;
   }
 
-  return { amemberUserId: amemberUser.userId, amemberUser };
+  return {
+    amemberUserId: amemberUser.userId,
+    amemberUser: applyAMemberUserDeletionSignals(amemberUser),
+  };
 };
 
 const buildRoleByProductId = async (context: AMemberSyncContext) => {
@@ -127,9 +134,9 @@ export const runAMemberSyncForUser = async ({
   const { amemberUserId, amemberUser } = resolved;
   const roleByProductId = await buildRoleByProductId(context);
 
-  if (!isAMemberUserActive(amemberUser)) {
+  if (!shouldSyncAMemberProductRolesForUser(amemberUser)) {
     logger.info(
-      `Revoking aMember product roles for Logto user ${logtoUser.id} because aMember user ${amemberUserId} is inactive`
+      `Revoking aMember product roles for Logto user ${logtoUser.id} because aMember user ${amemberUserId} is inactive or deleted`
     );
     const { removed } = await context.syncUserAMemberRoles(logtoUser.id, [], roleByProductId);
 

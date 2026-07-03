@@ -386,6 +386,21 @@ export const buildAMemberSuspensionUpdate = (
   return { isSuspended: user.isLocked };
 };
 
+/** aMember soft-deleted accounts use a login prefix instead of (or in addition to) a deleted flag. */
+export const deletedUserLoginPrefix = 'deleted-user';
+
+export const isDeletedUserLogin = (login: string) =>
+  login.trim().toLowerCase().startsWith(deletedUserLoginPrefix);
+
+/** Apply login-prefix and stored deletion signals onto an aMember user record. */
+export const applyAMemberUserDeletionSignals = (user: AMemberUser): AMemberUser => {
+  if (isDeletedUserLogin(user.login)) {
+    return { ...user, isDeleted: true };
+  }
+
+  return user;
+};
+
 export const isAMemberUserActive = (user: {
   status?: number | string;
   isDeleted?: boolean;
@@ -409,4 +424,42 @@ export const isAMemberUserActive = (user: {
   }
 
   return true;
+};
+
+/** Whether inbound sync should create or update a Logto user from this aMember record. */
+export const shouldProvisionLogtoUserFromAMember = (user: AMemberUser) =>
+  isAMemberUserActive(user) && !isDeletedUserLogin(user.login);
+
+/** Whether product roles should be synced for this aMember user (vs revoking all product roles). */
+export const shouldSyncAMemberProductRolesForUser = (user: AMemberUser) =>
+  shouldProvisionLogtoUserFromAMember(user) || Boolean(user.isLocked);
+
+export type AMemberLogtoUserDeletionState = {
+  amemberUser?: AMemberUser;
+  existsInAMember: boolean;
+};
+
+/**
+ * Whether a linked Logto user should be removed during inbound sync.
+ * Only soft-deleted accounts (`deleted-user*` login or `isDeleted`) and users
+ * missing from aMember are deleted. Inactive, expired, suspended, and pending
+ * users are retained in Logto.
+ */
+export const shouldDeleteLogtoUserForAMemberState = ({
+  amemberUser,
+  existsInAMember,
+}: AMemberLogtoUserDeletionState) => {
+  if (!existsInAMember) {
+    return true;
+  }
+
+  if (!amemberUser) {
+    return true;
+  }
+
+  if (isDeletedUserLogin(amemberUser.login) || amemberUser.isDeleted) {
+    return true;
+  }
+
+  return false;
 };
