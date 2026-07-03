@@ -33,7 +33,7 @@ vi.mock('./sinks/api-sink.js', async (importOriginal) => {
   };
 });
 
-const { pushLogtoUserToAMember } = await import('./outbound.js');
+const { pushLogtoUserToAMember, pushLogtoPasswordToAMember } = await import('./outbound.js');
 
 const createUser = () => ({
   id: 'logto-user-1',
@@ -95,5 +95,71 @@ describe('pushLogtoUserToAMember', () => {
 
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
     expect(sinkMocks.createUser).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('pushLogtoPasswordToAMember', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates password on a linked user without creating a duplicate', async () => {
+    const user = {
+      ...createUser(),
+      customData: {
+        amember: { userId: 88, lastOutboundPushAt: Date.now() - 60_000 },
+      },
+    };
+    const updateUserCustomData = vi.fn().mockResolvedValue(undefined);
+
+    await pushLogtoPasswordToAMember({
+      config,
+      context: { updateUserCustomData },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      user,
+      plainPassword: 'secret',
+    });
+
+    expect(sinkMocks.createUser).not.toHaveBeenCalled();
+    expect(sinkMocks.findUserByLoginOrEmail).not.toHaveBeenCalled();
+    expect(sinkMocks.updateUser).toHaveBeenCalledWith(88, { pass: 'secret' });
+  });
+
+  it('skips when the user was recently provisioned', async () => {
+    const user = {
+      ...createUser(),
+      customData: {
+        amember: { userId: 88, lastOutboundPushAt: Date.now() - 1_000 },
+      },
+    };
+    const updateUserCustomData = vi.fn().mockResolvedValue(undefined);
+
+    await pushLogtoPasswordToAMember({
+      config,
+      context: { updateUserCustomData },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      user,
+      plainPassword: 'secret',
+    });
+
+    expect(sinkMocks.updateUser).not.toHaveBeenCalled();
+    expect(sinkMocks.createUser).not.toHaveBeenCalled();
+  });
+
+  it('does not create a user when no aMember link exists', async () => {
+    const user = createUser();
+    sinkMocks.findUserByLoginOrEmail.mockResolvedValue(undefined);
+    const updateUserCustomData = vi.fn().mockResolvedValue(undefined);
+
+    await pushLogtoPasswordToAMember({
+      config,
+      context: { updateUserCustomData },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      user,
+      plainPassword: 'secret',
+    });
+
+    expect(sinkMocks.createUser).not.toHaveBeenCalled();
+    expect(sinkMocks.updateUser).not.toHaveBeenCalled();
   });
 });

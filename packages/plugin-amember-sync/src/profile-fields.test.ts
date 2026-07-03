@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildLogtoUserToAMemberFields,
   parseAMemberUserProfileFields,
   resolveDatabaseUserSelectColumns,
   wasRecentlyPushedToAMember,
@@ -89,6 +90,40 @@ describe('parseAMemberUserProfileFields', () => {
     ).toEqual(
       expect.objectContaining({
         isApproved: true,
+      })
+    );
+  });
+});
+
+describe('buildLogtoUserToAMemberFields', () => {
+  it('prefers Logto profile values over stale customData.amember profile fields', () => {
+    expect(
+      buildLogtoUserToAMemberFields({
+        username: 'jane',
+        primaryEmail: 'jane@example.com',
+        profile: {
+          givenName: 'Jane',
+          familyName: 'Doe',
+          address: {
+            postalCode: '62701',
+          },
+        },
+        customData: {
+          amember: {
+            userId: 1,
+            name_f: '62701',
+            name_l: 'Jane',
+            zip: '99999',
+          },
+        },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        login: 'jane',
+        email: 'jane@example.com',
+        name_f: 'Jane',
+        name_l: 'Doe',
+        zip: '62701',
       })
     );
   });

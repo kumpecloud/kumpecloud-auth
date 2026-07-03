@@ -336,6 +336,7 @@ export const createSignInExperienceLibrary = (
     const outboundEnabled = Boolean(resolveAMemberOutboundConfig(tenantId, outboundStored));
     const { catalog: signUpProfileFieldCatalog, signUpProfileFields } = outboundEnabled
       ? applyAMemberOutboundSignUpProfileFields(
+          tenantId,
           customProfileFields,
           signInExperience.signUpProfileFields
         )

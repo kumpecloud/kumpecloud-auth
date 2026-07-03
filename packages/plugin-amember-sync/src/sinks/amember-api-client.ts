@@ -12,5 +12,6 @@ export const createAMemberApiClient = (apiUrl: string, apiKey: string) =>
     },
     searchParams: { _key: apiKey },
     responseType: 'json',
-    retry: { limit: 2 },
+    // Never retry mutating POST requests; aMember may create duplicate users on replay.
+    retry: { limit: 0 },
   });

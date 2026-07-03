@@ -2,7 +2,7 @@ import {
   CustomProfileFieldType,
   SupportedDateFormat,
   type AddressProfileField,
-  type CustomProfileFieldUnion,
+  type CustomProfileField,
   type DateProfileField,
   type FullnameProfileField,
   type SignInExperience,
@@ -18,6 +18,13 @@ export const aMemberOutboundSignUpProfileFieldNames = [
 
 export type AMemberOutboundSignUpProfileFieldName =
   (typeof aMemberOutboundSignUpProfileFieldNames)[number];
+
+/** Stable synthetic IDs for runtime-only profile fields (max 21 chars). */
+const outboundSyntheticFieldIds: Record<AMemberOutboundSignUpProfileFieldName, string> = {
+  fullname: 'amember_ob_fullname',
+  birthdate: 'amember_ob_birthdt',
+  address: 'amember_ob_address',
+};
 
 const createFullnameField = (): FullnameProfileField => ({
   name: 'fullname',
@@ -98,29 +105,44 @@ export const createAMemberOutboundDefaultProfileFields = (): Array<
   FullnameProfileField | DateProfileField | AddressProfileField
 > => [createFullnameField(), createBirthdateField(), createAddressField()];
 
+const toSyntheticCustomProfileField = (
+  tenantId: string,
+  field: FullnameProfileField | DateProfileField | AddressProfileField,
+  sieOrder: number
+): CustomProfileField =>
+  ({
+    ...field,
+    tenantId,
+    id: outboundSyntheticFieldIds[field.name as AMemberOutboundSignUpProfileFieldName],
+    description: '',
+    required: true,
+    createdAt: 0,
+    sieOrder,
+  }) as CustomProfileField;
+
 const ensureOutboundRequiredField = (
-  catalogByName: Map<string, CustomProfileFieldUnion>,
-  field: FullnameProfileField | DateProfileField | AddressProfileField
+  catalogByName: Map<string, CustomProfileField>,
+  field: FullnameProfileField | DateProfileField | AddressProfileField,
+  tenantId: string,
+  allocateSieOrder: () => number
 ) => {
   const existing = catalogByName.get(field.name);
 
-  if (!existing) {
-    catalogByName.set(field.name, { ...field, required: true });
+  if (existing && existing.type === field.type) {
+    catalogByName.set(field.name, {
+      ...existing,
+      label: existing.label || field.label,
+      required: true,
+      // Enforce aMember-compatible part names (givenName, familyName, postalCode, etc.).
+      config: field.config,
+    });
     return;
   }
 
-  const label = existing.label ?? field.label;
-  const description =
-    'description' in existing && existing.description !== undefined
-      ? existing.description
-      : field.description;
-
-  catalogByName.set(field.name, {
-    ...field,
-    label,
-    ...(description !== undefined ? { description } : {}),
-    required: true,
-  });
+  catalogByName.set(
+    field.name,
+    toSyntheticCustomProfileField(tenantId, field, allocateSieOrder())
+  );
 };
 
 /**
@@ -128,16 +150,24 @@ const ensureOutboundRequiredField = (
  * Augments the profile field catalog and sign-up field list without persisting to the database.
  */
 export const applyAMemberOutboundSignUpProfileFields = (
-  catalog: Readonly<CustomProfileFieldUnion[]>,
+  tenantId: string,
+  catalog: Readonly<CustomProfileField[]>,
   signUpProfileFields: SignInExperience['signUpProfileFields']
 ): {
-  catalog: CustomProfileFieldUnion[];
+  catalog: CustomProfileField[];
   signUpProfileFields: SignInExperience['signUpProfileFields'];
 } => {
   const catalogByName = new Map(catalog.map((field) => [field.name, field]));
+  const maxSieOrder = catalog.reduce((max, field) => Math.max(max, field.sieOrder), 0);
+  let nextSieOrder = maxSieOrder;
+
+  const allocateSieOrder = () => {
+    nextSieOrder += 1;
+    return nextSieOrder;
+  };
 
   for (const field of createAMemberOutboundDefaultProfileFields()) {
-    ensureOutboundRequiredField(catalogByName, field);
+    ensureOutboundRequiredField(catalogByName, field, tenantId, allocateSieOrder);
   }
 
   const mergedCatalog = [...catalogByName.values()];

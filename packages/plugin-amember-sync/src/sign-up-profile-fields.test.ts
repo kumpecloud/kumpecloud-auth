@@ -1,4 +1,4 @@
-import { CustomProfileFieldType } from '@logto/schemas';
+import { CustomProfileFieldType, type CustomProfileField } from '@logto/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,16 +7,26 @@ import {
   validateAMemberOutboundUserProfile,
 } from './sign-up-profile-fields.js';
 
+const tenantId = 'default';
+
 describe('applyAMemberOutboundSignUpProfileFields()', () => {
   it('adds required profile fields to an empty catalog', () => {
-    const { catalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields([], null);
+    const { catalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields(
+      tenantId,
+      [],
+      null
+    );
 
     expect(catalog.map(({ name }) => name)).toEqual(['fullname', 'birthdate', 'address']);
     expect(signUpProfileFields).toBeNull();
+    expect(catalog.every((field) => field.tenantId === tenantId && field.id && field.sieOrder)).toBe(
+      true
+    );
   });
 
   it('appends required fields to an explicit sign-up field list', () => {
     const { catalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields(
+      tenantId,
       [],
       [{ name: 'website' }]
     );
@@ -31,31 +41,91 @@ describe('applyAMemberOutboundSignUpProfileFields()', () => {
   });
 
   it('forces outbound-required fields to be required', () => {
-    const { catalog } = applyAMemberOutboundSignUpProfileFields(
-      [
-        {
-          name: 'address',
-          type: CustomProfileFieldType.Address,
-          required: false,
-          config: {
-            parts: [
-              {
-                name: 'streetAddress',
-                enabled: true,
-                type: CustomProfileFieldType.Text,
-                required: false,
-              },
-            ],
+    const existingAddress: CustomProfileField = {
+      tenantId,
+      id: 'existing-address',
+      name: 'address',
+      type: CustomProfileFieldType.Address,
+      label: 'Mailing address',
+      description: '',
+      required: false,
+      createdAt: 1,
+      sieOrder: 2,
+      config: {
+        parts: [
+          {
+            name: 'streetAddress',
+            enabled: true,
+            type: CustomProfileFieldType.Text,
+            required: false,
+            label: 'Street',
           },
-        },
-      ],
+        ],
+      },
+    };
+
+    const { catalog } = applyAMemberOutboundSignUpProfileFields(
+      tenantId,
+      [existingAddress],
       null
     );
 
     const address = catalog.find(({ name }) => name === 'address');
 
     expect(address?.required).toBe(true);
+    expect(address?.id).toBe('existing-address');
     expect(address?.type).toBe(CustomProfileFieldType.Address);
+    expect(address?.config.parts?.map(({ name }) => name)).toEqual([
+      'streetAddress',
+      'locality',
+      'region',
+      'postalCode',
+    ]);
+  });
+
+  it('replaces misconfigured fullname parts with aMember-compatible defaults', () => {
+    const malformedFullname: CustomProfileField = {
+      tenantId,
+      id: 'malformed-fullname',
+      name: 'fullname',
+      type: CustomProfileFieldType.Fullname,
+      label: 'Name',
+      description: '',
+      required: false,
+      createdAt: 1,
+      sieOrder: 1,
+      config: {
+        parts: [
+          {
+            name: 'givenName',
+            enabled: true,
+            type: CustomProfileFieldType.Text,
+            required: false,
+            label: 'ZIP code',
+          },
+          {
+            name: 'familyName',
+            enabled: true,
+            type: CustomProfileFieldType.Text,
+            required: false,
+            label: 'First name',
+          },
+        ],
+      },
+    };
+
+    const { catalog } = applyAMemberOutboundSignUpProfileFields(
+      tenantId,
+      [malformedFullname],
+      null
+    );
+
+    const fullname = catalog.find(({ name }) => name === 'fullname');
+
+    expect(fullname?.config.parts).toEqual([
+      expect.objectContaining({ name: 'givenName', label: 'First name', required: true }),
+      expect.objectContaining({ name: 'familyName', label: 'Last name', required: true }),
+    ]);
   });
 });
 

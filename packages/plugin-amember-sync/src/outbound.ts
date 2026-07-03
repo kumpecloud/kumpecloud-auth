@@ -5,6 +5,7 @@ import {
   setAMemberLinkage,
   touchAMemberOutboundPush,
   unmarkLogtoGrantedProduct,
+  wasRecentlyPushedToAMember,
   type LogtoUserForAMemberOutbound,
 } from './profile-fields.js';
 import { createApiAMemberDataSink, type AMemberDataSink } from './sinks/api-sink.js';
@@ -184,6 +185,12 @@ export const pushLogtoUserToAMember = async ({
 }): Promise<void> => {
   const sink = createSink(config);
   const hadLinkedAMemberUser = getAMemberUserIdFromCustomData(user.customData ?? {}) !== undefined;
+
+  if (hadLinkedAMemberUser && wasRecentlyPushedToAMember(user.customData ?? {})) {
+    logger.info(`Skipping redundant aMember profile push for Logto user ${user.id}`);
+    return;
+  }
+
   const amemberUserId = await resolveAMemberUserId({
     user,
     sink,
@@ -197,8 +204,6 @@ export const pushLogtoUserToAMember = async ({
   if (hadLinkedAMemberUser) {
     assertAMemberOutboundUserProfile(user.profile);
     await sink.updateUser(amemberUserId, fields);
-  } else if (plainPassword) {
-    await sink.updateUser(amemberUserId, { pass: plainPassword });
   }
 
   const customData = touchAMemberOutboundPush(
@@ -222,14 +227,20 @@ export const pushLogtoPasswordToAMember = async ({
   user: AMemberOutboundPushUser;
   plainPassword: string;
 }): Promise<void> => {
+  if (wasRecentlyPushedToAMember(user.customData ?? {})) {
+    logger.info(`Skipping redundant aMember password push for Logto user ${user.id}`);
+    return;
+  }
+
   const sink = createSink(config);
-  const amemberUserId = await resolveAMemberUserId({
-    user,
-    sink,
-    plainPassword,
-    context,
-    logger,
-  });
+  const amemberUserId = await resolveExistingAMemberUserId({ user, sink, plainPassword });
+
+  if (amemberUserId === undefined) {
+    logger.warn(
+      `Skipping aMember password push for Logto user ${user.id}: no linked aMember user found`
+    );
+    return;
+  }
 
   await sink.updateUser(amemberUserId, { pass: plainPassword });
 

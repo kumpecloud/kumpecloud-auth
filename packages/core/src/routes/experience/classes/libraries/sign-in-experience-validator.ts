@@ -353,6 +353,7 @@ export class SignInExperienceValidator {
     }
 
     const { catalog: mergedCatalog, signUpProfileFields } = applyAMemberOutboundSignUpProfileFields(
+      this.libraries.tenantId,
       catalog,
       signInExperience.signUpProfileFields
     );

@@ -511,18 +511,25 @@ export const buildLogtoUserToAMemberFields = (
   }
 
   for (const descriptor of aMemberProfileFieldDescriptors) {
-    const value = amemberData[descriptor.customDataKey];
+    const { customDataKey } = descriptor;
+
+    // Logto `profile` is the source of truth for outbound name/address fields.
+    if (customDataKey in fields) {
+      continue;
+    }
+
+    const value = amemberData[customDataKey];
 
     if (value === undefined || value === null) {
       continue;
     }
 
     if (descriptor.kind === 'boolean') {
-      fields[descriptor.customDataKey] = value ? '1' : '0';
+      fields[customDataKey] = value ? '1' : '0';
       continue;
     }
 
-    fields[descriptor.customDataKey] = String(value);
+    fields[customDataKey] = String(value);
   }
 
   return fields;
