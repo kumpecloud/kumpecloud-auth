@@ -129,12 +129,14 @@ const ensureOutboundRequiredField = (
   const existing = catalogByName.get(field.name);
 
   if (existing && existing.type === field.type) {
+    const merged = toSyntheticCustomProfileField(tenantId, field, existing.sieOrder);
+
     catalogByName.set(field.name, {
-      ...existing,
-      label: existing.label || field.label,
-      required: true,
-      // Enforce aMember-compatible part names (givenName, familyName, postalCode, etc.).
-      config: field.config,
+      ...merged,
+      id: existing.id,
+      createdAt: existing.createdAt,
+      description: existing.description || merged.description,
+      label: existing.label || merged.label,
     });
     return;
   }
