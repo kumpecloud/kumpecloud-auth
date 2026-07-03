@@ -1,5 +1,6 @@
 import type { ManagementApiRouter, RouterInitArgs } from '../types.js';
 
+import adminUserAMemberSyncRoutes from './amember-sync.js';
 import adminUserBasicsRoutes from './basics.js';
 import adminUserEnterpriseSsoRoutes from './enterprise-sso.js';
 import adminUserGrantRoutes from './grants.js';
@@ -22,4 +23,5 @@ export default function adminUserRoutes<T extends ManagementApiRouter>(...args: 
   adminUserPersonalAccessTokenRoutes(...args);
   adminUserEnterpriseSsoRoutes(...args);
   adminUserSessionRoutes(...args);
+  adminUserAMemberSyncRoutes(...args);
 }

@@ -1,0 +1,51 @@
+{
+  "paths": {
+    "/api/my-account/amember-sync": {
+      "post": {
+        "operationId": "SyncMyAMemberAccess",
+        "summary": "Sync aMember access for current user",
+        "description": "Pull the calling user's active aMember access records and update their Logto product role assignments immediately. Requires the `roles` user scope. Use this after granting access in aMember so the user does not need to wait for the scheduled inbound sync.",
+        "responses": {
+          "200": {
+            "description": "aMember access was synced successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "amemberUserId": {
+                      "type": "integer",
+                      "description": "The linked aMember user ID."
+                    },
+                    "productIds": {
+                      "type": "array",
+                      "items": { "type": "integer" },
+                      "description": "Active aMember product IDs synced to Logto roles."
+                    },
+                    "roleAssignmentsAdded": {
+                      "type": "integer",
+                      "description": "Number of product role assignments added."
+                    },
+                    "roleAssignmentsRemoved": {
+                      "type": "integer",
+                      "description": "Number of product role assignments removed."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing the `roles` scope."
+          },
+          "404": {
+            "description": "No matching aMember user was found for this Logto account."
+          },
+          "503": {
+            "description": "Inbound aMember sync is not configured or the database connection failed."
+          }
+        }
+      }
+    }
+  }
+}

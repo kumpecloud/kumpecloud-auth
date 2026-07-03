@@ -56,6 +56,12 @@ export {
 } from './outbound.js';
 export { runAMemberSync } from './sync.js';
 export {
+  AMemberUserNotFoundError,
+  runAMemberSyncForUser,
+  type AMemberUserSyncStats,
+  type LogtoUserForAMemberSync,
+} from './sync-user.js';
+export {
   applyAMemberOutboundSignUpRequirements,
   assertAMemberOutboundUserProfile,
   getAMemberOutboundMandatoryProfiles,

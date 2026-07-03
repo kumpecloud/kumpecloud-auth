@@ -1,0 +1,4 @@
+interface:
+  display_name: "KumpeApps Auth"
+  short_description: "KumpeCloud Auth, Logto, and aMember sync expert"
+  default_prompt: "Use $kumpeapps-auth for OIDC integration, aMember sync, roles, Management API, or KumpeCloud Auth deployment questions."

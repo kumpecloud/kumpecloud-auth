@@ -21,6 +21,7 @@ import { assertUserHasRemainingIdentifier, assertUsernameAllowed } from '#src/ut
 import { PasswordValidator } from '../experience/classes/libraries/password-validator.js';
 import type { UserRouter, RouterInitArgs } from '../types.js';
 
+import accountAMemberSyncRoutes from './amember-sync.js';
 import { accountApiPrefix } from './constants.js';
 import emailAndPhoneRoutes from './email-and-phone.js';
 import accountGrantRoutes from './grants.js';
@@ -319,6 +320,7 @@ export default function accountRoutes<T extends UserRouter>(...args: RouterInitA
   );
 
   logtoConfigRoutes(...args);
+  accountAMemberSyncRoutes(...args);
   thirdPartyTokensRoutes(...args);
   emailAndPhoneRoutes(...args);
   identitiesRoutes(...args);

@@ -214,5 +214,80 @@ export const createApiAMemberDataSource = ({
         .map((item) => mapAccess(item))
         .filter((item): item is AMemberAccess => item !== undefined);
     },
+    getUserById: async (userId) => {
+      const body = await readAMemberJsonResponse(`get user ${userId}`, () =>
+        client.get(`users/${userId}`).json<unknown>()
+      );
+
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        return mapUser(body as RawUser);
+      }
+
+      const [item] = extractItems<RawUser>(body);
+
+      return item ? mapUser(item) : undefined;
+    },
+    findUserByLoginOrEmail: async ({ login, email }) => {
+      const filters: Array<Record<string, string>> = [];
+
+      if (login?.trim()) {
+        filters.push({ '_filter[login]': login.trim() });
+      }
+
+      if (email?.trim()) {
+        filters.push({ '_filter[email]': email.trim() });
+      }
+
+      for (const searchParams of filters) {
+        const body = await readAMemberJsonResponse('find user', () =>
+          client.get('users', { searchParams }).json<unknown>()
+        );
+        const [item] = extractItems<RawUser>(body);
+        const user = item ? mapUser(item) : undefined;
+
+        if (user) {
+          return user;
+        }
+      }
+    },
+    getAccessRecordsForUser: async (userId) => {
+      const body = await readAMemberJsonResponse(`list access for user ${userId}`, () =>
+        client
+          .get('access', {
+            searchParams: {
+              '_filter[user_id]': String(userId),
+            },
+          })
+          .json<unknown>()
+      );
+
+      return extractItems<RawAccess>(body)
+        .map((item) => mapAccess(item))
+        .filter((item): item is AMemberAccess => item !== undefined);
+    },
+    getProductsByIds: async (productIds) => {
+      if (productIds.length === 0) {
+        return [];
+      }
+
+      const products = await Promise.all(
+        productIds.map(async (productId) => {
+          const body = await readAMemberJsonResponse(`get product ${productId}`, () =>
+            client
+              .get('products', {
+                searchParams: {
+                  '_filter[product_id]': String(productId),
+                },
+              })
+              .json<unknown>()
+          );
+          const [item] = extractItems<RawProduct>(body);
+
+          return item ? mapProduct(item) : undefined;
+        })
+      );
+
+      return products.filter((item): item is AMemberProduct => item !== undefined);
+    },
   };
 };

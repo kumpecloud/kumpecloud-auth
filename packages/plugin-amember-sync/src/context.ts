@@ -6,6 +6,13 @@ export type AMemberDataSource = {
   getProducts: () => Promise<AMemberProduct[]>;
   getUsers: () => Promise<AMemberUser[]>;
   getAccessRecords: () => Promise<AMemberAccess[]>;
+  getUserById: (userId: number) => Promise<AMemberUser | undefined>;
+  findUserByLoginOrEmail: (params: {
+    login?: string;
+    email?: string;
+  }) => Promise<AMemberUser | undefined>;
+  getAccessRecordsForUser: (userId: number) => Promise<AMemberAccess[]>;
+  getProductsByIds: (productIds: number[]) => Promise<AMemberProduct[]>;
 };
 
 export type LogtoUserRecord = {
