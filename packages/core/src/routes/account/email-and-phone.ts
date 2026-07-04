@@ -6,6 +6,7 @@ import koaGuard from '#src/middleware/koa-guard.js';
 import { assertUserHasRemainingIdentifier } from '#src/utils/user.js';
 
 import RequestError from '../../errors/RequestError/index.js';
+import { pushUpdatedUserToAMember, requiresAMemberUserProvisioning } from '../../libraries/amember-sync/outbound.js';
 import { validateEmailAgainstBlocklistPolicy } from '../../libraries/sign-in-experience/email-blocklist-policy.js';
 import { buildVerificationRecordByIdAndType } from '../../libraries/verification.js';
 import assertThat from '../../utils/assert-that.js';
@@ -14,7 +15,7 @@ import type { UserRouter, RouterInitArgs } from '../types.js';
 import { accountApiPrefix } from './constants.js';
 
 export default function emailAndPhoneRoutes<T extends UserRouter>(...args: RouterInitArgs<T>) {
-  const [router, { queries, libraries }] = args;
+  const [router, { queries, libraries, id: tenantId }] = args;
   const {
     users: { updateUserById, findUserById },
     signInExperiences: { findDefaultSignInExperience },
@@ -69,6 +70,8 @@ export default function emailAndPhoneRoutes<T extends UserRouter>(...args: Route
 
       ctx.appendDataHookContext('User.Data.Updated', { user: updatedUser });
 
+      pushUpdatedUserToAMember(tenantId, userId);
+
       ctx.status = 204;
 
       return next();
@@ -93,6 +96,13 @@ export default function emailAndPhoneRoutes<T extends UserRouter>(...args: Route
       );
 
       assertThat(scopes.has(UserScope.Email), 'auth.unauthorized');
+
+      if (await requiresAMemberUserProvisioning(tenantId)) {
+        throw new RequestError({
+          code: 'user.amember_email_required',
+          status: 422,
+        });
+      }
 
       const [user, ssoIdentities] = await Promise.all([
         findUserById(userId),
@@ -149,6 +159,8 @@ export default function emailAndPhoneRoutes<T extends UserRouter>(...args: Route
       const updatedUser = await updateUserById(userId, { primaryPhone: phone });
 
       ctx.appendDataHookContext('User.Data.Updated', { user: updatedUser });
+
+      pushUpdatedUserToAMember(tenantId, userId);
 
       ctx.status = 204;
 
