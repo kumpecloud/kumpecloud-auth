@@ -120,6 +120,7 @@ const SelectField = ({
           onBlur={onBlur}
         />
         <Dropdown
+          hasOverflowContent
           isFullWidth
           anchorRef={ref}
           className={styles.dropdown}

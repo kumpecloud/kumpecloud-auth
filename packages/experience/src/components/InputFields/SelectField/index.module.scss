@@ -54,6 +54,7 @@
 .dropdown {
   padding: _.unit(1);
   max-height: 288px;
+  overflow-y: auto;
 }
 
 .focused {
