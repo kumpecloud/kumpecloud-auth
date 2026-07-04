@@ -2,6 +2,7 @@ import { adminTenantId, fullSignInExperienceGuard, AccountCenters } from '@logto
 import { z } from 'zod';
 
 import { EnvSet, getTenantEndpoint } from '#src/env-set/index.js';
+import { resolveAccountCenterForRequest } from '#src/libraries/amember-sync/account-center.js';
 import koaGuard from '#src/middleware/koa-guard.js';
 import type TenantContext from '#src/tenants/TenantContext.js';
 import { getExperienceLanguage } from '#src/utils/i18n.js';
@@ -21,7 +22,6 @@ export default function wellKnownRoutes<T extends AnonymousRouter>(
   const {
     customPhrases: { findAllCustomLanguageTags },
     signInExperiences: { findDefaultSignInExperience },
-    accountCenters: { findDefaultAccountCenter },
   } = queries;
 
   if (tenantId === adminTenantId) {
@@ -91,7 +91,7 @@ export default function wellKnownRoutes<T extends AnonymousRouter>(
       status: 200,
     }),
     async (ctx, next) => {
-      ctx.body = await findDefaultAccountCenter();
+      ctx.body = await resolveAccountCenterForRequest(queries);
       return next();
     }
   );

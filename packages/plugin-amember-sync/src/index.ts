@@ -72,6 +72,7 @@ export {
   createAMemberOutboundDefaultProfileFields,
   validateAMemberOutboundUserProfile,
 } from './sign-up-profile-fields.js';
+export { applyAMemberOutboundAccountCenterProfileFields } from './account-center-profile-fields.js';
 export {
   buildAMemberPhoneUpdate,
   buildAMemberSuspensionUpdate,

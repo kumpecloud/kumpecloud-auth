@@ -61,11 +61,42 @@ describe('pushLogtoUserToAMember', () => {
     });
 
     expect(sinkMocks.createUser).not.toHaveBeenCalled();
+    expect(sinkMocks.updateUser).toHaveBeenCalledWith(
+      88,
+      expect.objectContaining({
+        email: 'jane@example.com',
+        pass: 'secret',
+      })
+    );
     expect(updateUserCustomData).toHaveBeenCalledWith(
       user.id,
       expect.objectContaining({
         amember: expect.objectContaining({ userId: 88 }),
       })
+    );
+  });
+
+  it('pushes profile updates for a linked user', async () => {
+    const user = {
+      ...createUser(),
+      customData: {
+        amember: { userId: 88, lastOutboundPushAt: Date.now() - 60_000 },
+      },
+    };
+    const updateUserCustomData = vi.fn().mockResolvedValue(undefined);
+
+    await pushLogtoUserToAMember({
+      config,
+      context: { updateUserCustomData },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      user,
+    });
+
+    expect(sinkMocks.createUser).not.toHaveBeenCalled();
+    expect(sinkMocks.findUserByLoginOrEmail).not.toHaveBeenCalled();
+    expect(sinkMocks.updateUser).toHaveBeenCalledWith(
+      88,
+      expect.objectContaining({ email: 'jane@example.com' })
     );
   });
 
