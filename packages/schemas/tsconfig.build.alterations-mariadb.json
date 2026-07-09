@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig",
+  "compilerOptions": {
+    "declaration": false,
+    "outDir": "alterations-mariadb-js"
+  },
+  "include": ["alterations-mariadb"],
+  "exclude": []
+}

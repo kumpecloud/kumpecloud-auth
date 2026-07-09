@@ -1,4 +1,9 @@
 import { type SchemaLike, type Table } from '@logto/shared';
+import {
+  buildOnConflictDoNothing,
+  DatabaseDialect,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 import { type CamelCase, type KeysToCamelCase } from '@silverhand/essentials';
 import { sql, type CommonQueryMethods } from '@silverhand/slonik';
 import snakecaseKeys from 'snakecase-keys';
@@ -120,6 +125,8 @@ export default class RelationQueries<
    * ```
    */
   async insert(...data: ReadonlyArray<CamelCaseIdObject<Schemas[number]['tableSingular']>>) {
+    const dialect = getDatabaseDialectFromEnv();
+
     return this.pool.query(sql`
       insert into ${this.table} (${sql.join(
         this.schemas.map(({ tableSingular }) => sql.identifier([tableSingular + '_id'])),
@@ -138,7 +145,7 @@ export default class RelationQueries<
         ),
         sql`, `
       )}
-      ${sql`on conflict do nothing`}
+      ${buildOnConflictDoNothing(dialect)}
     `);
   }
 
@@ -340,6 +347,51 @@ export class TwoRelationsQueries<
     schema1Id: string,
     schema2Ids: readonly string[]
   ): Promise<{ added: readonly string[]; removed: readonly string[] }> {
+    const dialect = getDatabaseDialectFromEnv();
+
+    if (dialect === DatabaseDialect.MariaDB) {
+      return this.pool.transaction(async (transaction) => {
+        await transaction.query(sql`
+          select id
+          from ${sql.identifier([this.schemas[0].table])}
+          where id = ${schema1Id}
+          for update
+        `);
+
+        const schema1IdField = sql.identifier([this.schemas[0].tableSingular + '_id']);
+        const schema2IdField = sql.identifier([this.schemas[1].tableSingular + '_id']);
+        const nextIds = new Set(schema2Ids);
+        const { rows: existingRows } = await transaction.query<{ id: string }>(sql`
+          select ${schema2IdField} as id from ${this.table}
+          where ${schema1IdField} = ${schema1Id}
+        `);
+        const existingIds = new Set(existingRows.map(({ id }) => id));
+        const added = [...nextIds].filter((id) => !existingIds.has(id));
+        const removed = [...existingIds].filter((id) => !nextIds.has(id));
+
+        if (added.length > 0) {
+          await transaction.query(sql`
+            insert into ${this.table} (${schema1IdField}, ${schema2IdField})
+            values ${sql.join(
+              added.map((schema2Id) => sql`(${schema1Id}, ${schema2Id})`),
+              sql`, `
+            )}
+            on duplicate key update tenant_id = tenant_id
+          `);
+        }
+
+        if (removed.length > 0) {
+          await transaction.query(sql`
+            delete from ${this.table}
+            where ${schema1IdField} = ${schema1Id}
+              and ${schema2IdField} in (${sql.join(removed, sql`, `)})
+          `);
+        }
+
+        return { added, removed };
+      });
+    }
+
     return this.pool.transaction(async (transaction) => {
       // Lock schema1 row.
       await transaction.query(sql`

@@ -13,6 +13,21 @@ import { DatabaseError } from 'pg-protocol';
 import RequestError from '#src/errors/RequestError/index.js';
 import { DeletionError, InsertionError, UpdateError } from '#src/errors/SlonikError/index.js';
 
+type MysqlLikeError = Error & {
+  errno?: number;
+  code?: string;
+  sqlMessage?: string;
+};
+
+const isMysqlLikeError = (error: unknown): error is MysqlLikeError =>
+  error instanceof Error && typeof (error as MysqlLikeError).errno === 'number';
+
+const getConstraintFromMysqlMessage = (message: string) => {
+  const match = /for key '([^']+)'/.exec(message);
+
+  return match?.[1];
+};
+
 /**
  * @remarks
  * We are now upgrading this error handler to handle both SlonikError and DatabaseError.
@@ -25,8 +40,82 @@ export default function koaSlonikErrorHandler<StateT, ContextT>(): Middleware<St
     try {
       await next();
     } catch (error: unknown) {
-      if (!(error instanceof SlonikError) && !(error instanceof DatabaseError)) {
+      if (!(error instanceof SlonikError) && !(error instanceof DatabaseError) && !isMysqlLikeError(error)) {
         throw error;
+      }
+
+      if (isMysqlLikeError(error)) {
+        if (error.errno === 1406) {
+          throw new RequestError(
+            {
+              code: 'entity.value_too_long',
+              status: 422,
+            },
+            {
+              message: error.message,
+            }
+          );
+        }
+
+        if (error.errno === 1452) {
+          throw new RequestError({
+            code: 'entity.relation_foreign_key_not_found',
+            status: 404,
+          });
+        }
+
+        if (error.errno === 3819 || error.errno === 4025) {
+          throw new RequestError({
+            code: 'entity.db_constraint_violated',
+            status: 422,
+          });
+        }
+
+        if (error.errno === 1062) {
+          const constraint = getConstraintFromMysqlMessage(error.sqlMessage ?? error.message);
+
+          if (constraint === 'applications__protected_app_metadata_host') {
+            throw new RequestError({
+              code: 'application.protected_application_subdomain_exists',
+              status: 422,
+            });
+          }
+
+          if (constraint === 'applications__protected_app_metadata_custom_domain') {
+            throw new RequestError({
+              code: 'domain.hostname_already_exists',
+              status: 422,
+            });
+          }
+
+          if (constraint === 'users__username') {
+            throw new RequestError({
+              code: 'user.username_already_in_use',
+              status: 422,
+            });
+          }
+
+          if (constraint === 'users__primary_email') {
+            throw new RequestError({
+              code: 'user.email_already_in_use',
+              status: 422,
+            });
+          }
+
+          if (constraint === 'users__primary_phone') {
+            throw new RequestError({
+              code: 'user.phone_already_in_use',
+              status: 422,
+            });
+          }
+
+          if (constraint === 'custom_profile_fields__name') {
+            throw new RequestError({
+              code: 'custom_profile_fields.name_exists',
+              status: 422,
+            });
+          }
+        }
       }
 
       if (error instanceof DatabaseError) {

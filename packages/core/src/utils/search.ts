@@ -1,4 +1,5 @@
 import { SearchJointMode, SearchMatchMode } from '@logto/schemas';
+import { asSqlFragment, getQueryDialectFromUrl } from '@logto/database';
 import type { Nullable, Optional } from '@silverhand/essentials';
 import { yes, conditionalString, cond } from '@silverhand/essentials';
 import { sql } from '@silverhand/slonik';
@@ -167,14 +168,18 @@ const getJointModeSql = (mode: SearchJointMode) => {
   }
 };
 
-const getMatchModeOperator = (match: SearchMatchMode, isCaseSensitive: boolean) => {
+const getMatchModeOperator = (
+  match: SearchMatchMode,
+  isCaseSensitive: boolean,
+  queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '')
+) => {
   switch (match) {
     case SearchMatchMode.Exact: {
-      return sql`=`;
+      return queryDialect.buildExactOperator();
     }
 
     case SearchMatchMode.Like: {
-      return isCaseSensitive ? sql`~~` : sql`~~*`;
+      return queryDialect.buildLikeOperator(isCaseSensitive);
     }
 
     case SearchMatchMode.SimilarTo: {
@@ -183,11 +188,11 @@ const getMatchModeOperator = (match: SearchMatchMode, isCaseSensitive: boolean) 
         new TypeError('Cannot use case-insensitive match for `similar to`.')
       );
 
-      return sql`similar to`;
+      return queryDialect.buildSimilarToOperator();
     }
 
     case SearchMatchMode.Posix: {
-      return isCaseSensitive ? sql`~` : sql`~*`;
+      return queryDialect.buildRegexOperator(isCaseSensitive);
     }
   }
 };
@@ -195,7 +200,8 @@ const getMatchModeOperator = (match: SearchMatchMode, isCaseSensitive: boolean) 
 const validateAndBuildValueExpression = (
   rawValues: string[],
   field: string,
-  shouldLowercase: boolean
+  shouldLowercase: boolean,
+  queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '')
 ) => {
   const values = shouldLowercase ? rawValues.map((rawValue) => rawValue.toLowerCase()) : rawValues;
 
@@ -205,10 +211,7 @@ const validateAndBuildValueExpression = (
     new TypeError(`Empty value found${conditionalString(field && ` for field ${field}`)}.`)
   );
 
-  const valueExpression =
-    values.length === 1 ? sql`${values[0]}` : sql`any(${sql.array(values, 'varchar')})`;
-
-  return valueExpression;
+  return queryDialect.buildValueListExpression(values, shouldLowercase);
 };
 
 /**
@@ -244,7 +247,7 @@ export const buildConditionsFromSearch = (search: Search, searchFields: readonly
         (field) =>
           sql`${
             shouldLowercase ? sql`lower(${sql.identifier([field])})` : sql.identifier([field])
-          } ${getMatchModeOperator(mode, isCaseSensitive)} ${getValueExpressionFor(
+          } ${asSqlFragment(getMatchModeOperator(mode, isCaseSensitive))} ${getValueExpressionFor(
             field,
             shouldLowercase
           )}`

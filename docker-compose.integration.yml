@@ -12,6 +12,19 @@ services:
       timeout: 3s
       retries: 20
 
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: p0stgr3s
+      MARIADB_DATABASE: logto
+      MARIADB_USER: logto
+      MARIADB_PASSWORD: p0stgr3s
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   redis:
     image: redis:6-alpine
     healthcheck:
@@ -37,10 +50,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mariadb:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DB_URL: postgres://postgres:p0stgr3s@postgres:5432/postgres
+      DB_URL: ${DB_URL:-postgres://postgres:p0stgr3s@postgres:5432/postgres}
       REDIS_URL: redis://redis:6379
       SECRET_VAULT_KEK: DtPWS09unRXGuRScB60qXqCSsrjd22dUlXt/0oZgxSo=
       STATUS_API_KEY: test-status-api-key

@@ -1,0 +1,16 @@
+# Local MariaDB development for KumpeCloud Auth (Issue #99)
+services:
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: p0stgr3s
+      MARIADB_DATABASE: logto
+      MARIADB_USER: logto
+      MARIADB_PASSWORD: p0stgr3s
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

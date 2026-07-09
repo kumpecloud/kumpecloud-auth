@@ -1,5 +1,6 @@
 import type { CreateUsersRole, UsersRole } from '@logto/schemas';
 import { UsersRoles } from '@logto/schemas';
+import { buildInArrayCondition, getDatabaseDialectFromEnv } from '@logto/database';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
@@ -9,6 +10,7 @@ import { conditionalSql, convertToIdentifiers } from '#src/utils/sql.js';
 const { table, fields } = convertToIdentifiers(UsersRoles);
 
 export const createUsersRolesQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
   const countUsersRolesByRoleId = async (roleId: string) =>
     pool.one<{ count: number }>(sql`
       select count(*)
@@ -43,7 +45,7 @@ export const createUsersRolesQueries = (pool: CommonQueryMethods) => {
       select 1
       from ${table}
       where ${fields.userId} = ${userId}
-        and ${fields.roleId} = any(${sql.array(roleIds, 'varchar')})
+        and ${buildInArrayCondition(fields.roleId, roleIds, dialect)}
     `);
   };
 

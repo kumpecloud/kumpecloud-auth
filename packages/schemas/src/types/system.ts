@@ -4,18 +4,24 @@ import { z } from 'zod';
 // Alteration state
 export enum AlterationStateKey {
   AlterationState = 'alterationState',
+  MariaDBAlterationState = 'mariadbAlterationState',
 }
 
 export type AlterationState = { timestamp: number; updatedAt?: string };
 
 export type AlterationStateType = {
   [AlterationStateKey.AlterationState]: AlterationState;
+  [AlterationStateKey.MariaDBAlterationState]: AlterationState;
 };
 
 export const alterationStateGuard: Readonly<{
   [key in AlterationStateKey]: ZodType<AlterationStateType[key]>;
 }> = Object.freeze({
   [AlterationStateKey.AlterationState]: z.object({
+    timestamp: z.number(),
+    updatedAt: z.string().optional(),
+  }),
+  [AlterationStateKey.MariaDBAlterationState]: z.object({
     timestamp: z.number(),
     updatedAt: z.string().optional(),
   }),

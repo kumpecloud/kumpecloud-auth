@@ -1,5 +1,6 @@
 import type { ApplicationsRole, CreateApplicationsRole, Role } from '@logto/schemas';
 import { Roles, ApplicationsRoles, RolesScopes } from '@logto/schemas';
+import { DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { type Nullable } from '@silverhand/essentials';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
@@ -11,6 +12,8 @@ const { table, fields } = convertToIdentifiers(ApplicationsRoles, true);
 const { fields: insertFields } = convertToIdentifiers(ApplicationsRoles);
 
 export const createApplicationsRolesQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
+  const rolesTable = sql.identifier([Roles.table]);
   const findFirstApplicationsRolesByRoleIdAndApplicationIds = async (
     roleId: string,
     applicationIds: string[]
@@ -36,7 +39,18 @@ export const createApplicationsRolesQueries = (pool: CommonQueryMethods) => {
     pool.any<ApplicationsRole & { role: Role }>(sql`
       select
         ${sql.join(Object.values(fields), sql`,`)},
-        to_jsonb(${sql.identifier([Roles.table])}) as role
+        ${
+          dialect === DatabaseDialect.MariaDB
+            ? sql`JSON_OBJECT(
+                'id', ${rolesTable}.id,
+                'tenantId', ${rolesTable}.tenant_id,
+                'name', ${rolesTable}.name,
+                'description', ${rolesTable}.description,
+                'type', ${rolesTable}.type,
+                'isDefault', ${rolesTable}.is_default
+              ) as role`
+            : sql`to_jsonb(${rolesTable}) as role`
+        }
       from ${table}
       join roles on ${sql.identifier([Roles.table, Roles.fields.id])} = ${fields.roleId}
       where ${fields.applicationId}=${applicationId}

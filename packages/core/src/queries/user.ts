@@ -1,6 +1,14 @@
 /* eslint-disable max-lines */
 import type { User, CreateUser } from '@logto/schemas';
 import { MfaFactor, Users } from '@logto/schemas';
+import {
+  buildDateGroupExpression,
+  buildJsonContains,
+  buildJsonRemoveKey,
+  buildTimestampFromMillis,
+  DatabaseDialect,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 import { PhoneNumberParser } from '@logto/shared';
 import { cond, conditionalArray, type Nullable, pick } from '@silverhand/essentials';
 import type { CommonQueryMethods } from '@silverhand/slonik';
@@ -64,6 +72,7 @@ export const userSearchKeys = Object.freeze([
 export const userSearchFields = Object.freeze(Object.values(pick(Users.fields, ...userSearchKeys)));
 
 export const createUserQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
   const findUserByUsername = async (username: string, caseSensitive: boolean) =>
     pool.maybeOne<User>(sql`
       select ${sql.join(Object.values(fields), sql`,`)}
@@ -191,16 +200,27 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
    * with the colliding user ids. Ordered oldest-group-first and capped by `limit` for sampling.
    */
   const findUsernameCaseConflicts = async (limit: number) =>
-    pool.any<{ usernameLower: string; userIds: string[] }>(sql`
-      select lower(${fields.username}) as "usernameLower",
-             array_agg(${fields.id}) as "userIds"
-      from ${table}
-      where ${fields.username} is not null
-      group by lower(${fields.username})
-      having count(*) > 1
-      order by min(${fields.createdAt})
-      limit ${limit}
-    `);
+    dialect === DatabaseDialect.MariaDB
+      ? pool.any<{ usernameLower: string; userIds: string[] }>(sql`
+          select lower(${fields.username}) as usernameLower,
+                 JSON_ARRAYAGG(${fields.id}) as userIds
+          from ${table}
+          where ${fields.username} is not null
+          group by lower(${fields.username})
+          having count(*) > 1
+          order by min(${fields.createdAt})
+          limit ${limit}
+        `)
+      : pool.any<{ usernameLower: string; userIds: string[] }>(sql`
+          select lower(${fields.username}) as "usernameLower",
+                 array_agg(${fields.id}) as "userIds"
+          from ${table}
+          where ${fields.username} is not null
+          group by lower(${fields.username})
+          having count(*) > 1
+          order by min(${fields.createdAt})
+          limit ${limit}
+        `);
 
   /** Total number of case-insensitive username collision groups (see {@link findUsernameCaseConflicts}). */
   const countUsernameCaseConflicts = async () =>
@@ -370,13 +390,17 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
         sql`,`
       )}
       from ${table}
-      where ${fields.mfaVerifications}::jsonb @> ${sql.jsonb([
-        {
-          type: MfaFactor.WebAuthn,
-          credentialId,
-          ...cond(rpId && { rpId }),
-        },
-      ])}
+      where ${buildJsonContains(
+        fields.mfaVerifications,
+        sql.jsonb([
+          {
+            type: MfaFactor.WebAuthn,
+            credentialId,
+            ...cond(rpId && { rpId }),
+          },
+        ]),
+        dialect
+      )}
       limit 1
     `);
 
@@ -435,13 +459,15 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
     }
   };
 
-  const deleteUserIdentity = async (userId: string, target: string) =>
-    pool.one<User>(sql`
+  const deleteUserIdentity = async (userId: string, target: string) => {
+    await pool.query(sql`
       update ${table}
-      set ${fields.identities}=${fields.identities}::jsonb-${target}
+      set ${fields.identities}=${buildJsonRemoveKey(fields.identities, target, dialect)}
       where ${fields.id}=${userId}
-      returning *
     `);
+
+    return pool.one<User>(sql`select * from ${table} where ${fields.id}=${userId}`);
+  };
 
   const hasActiveUsers = async () =>
     pool.exists(sql`
@@ -456,11 +482,11 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
     endTimeInclusive: number
   ) =>
     pool.any<{ date: string; count: number }>(sql`
-      select date(${fields.createdAt}), count(*)
+      select ${buildDateGroupExpression(fields.createdAt, dialect)}, count(*)
       from ${table}
-      where ${fields.createdAt} > to_timestamp(${startTimeExclusive}::double precision / 1000)
-      and ${fields.createdAt} <= to_timestamp(${endTimeInclusive}::double precision / 1000)
-      group by date(${fields.createdAt})
+      where ${buildTimestampFromMillis(fields.createdAt, startTimeExclusive, dialect)}
+      and ${fields.createdAt} <= ${dialect === DatabaseDialect.MariaDB ? sql`FROM_UNIXTIME(${endTimeInclusive} / 1000)` : sql`to_timestamp(${endTimeInclusive}::double precision / 1000)`}
+      group by ${buildDateGroupExpression(fields.createdAt, dialect)}
     `);
 
   return {

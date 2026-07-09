@@ -1,13 +1,16 @@
 import type { SchemaLike } from '@logto/schemas';
 import { parseTimeoutEnv } from '@logto/shared';
-import { assert, conditional } from '@silverhand/essentials';
 import {
-  createPool,
+  createDatabasePool,
+  createPostgresPool,
+  DatabaseDialect,
+  parseDatabaseUrl,
   parseDsn,
-  sql,
   stringifyDsn,
-  createInterceptorsPreset,
-} from '@silverhand/slonik';
+} from '@logto/database';
+import type { DatabasePool as SlonikDatabasePool } from '@silverhand/slonik';
+import { assert, conditional } from '@silverhand/essentials';
+import { sql } from '@silverhand/slonik';
 import decamelize from 'decamelize';
 import { DatabaseError } from 'pg-protocol';
 
@@ -16,7 +19,7 @@ import { ConfigKey, consoleLog, getCliConfigWithPrompt } from './utils.js';
 
 const databaseStatementTimeout = parseTimeoutEnv(process.env.DATABASE_STATEMENT_TIMEOUT);
 
-export const defaultDatabaseUrl = 'postgresql://localhost:5432/logto';
+export const defaultDatabaseUrl = 'mariadb://logto:p0stgr3s@localhost:3306/logto';
 
 export const getDatabaseUrlFromConfig = async () =>
   (await getCliConfigWithPrompt({
@@ -25,46 +28,78 @@ export const getDatabaseUrlFromConfig = async () =>
     defaultValue: defaultDatabaseUrl,
   })) ?? '';
 
-export const createPoolFromConfig = async () => {
-  const databaseUrl = await getDatabaseUrlFromConfig();
-  assert(parseDsn(databaseUrl).databaseName, new Error('Database name is required in URL'));
+const getPoolOptions = () => ({
+  ...conditional(
+    databaseStatementTimeout !== undefined && { statementTimeout: databaseStatementTimeout }
+  ),
+});
 
-  return createPool(databaseUrl, {
-    interceptors: createInterceptorsPreset(),
-    ...conditional(
-      databaseStatementTimeout !== undefined && { statementTimeout: databaseStatementTimeout }
-    ),
-  });
+export const getDatabaseDialect = (databaseUrl?: string) =>
+  parseDatabaseUrl(databaseUrl ?? process.env.DB_URL ?? defaultDatabaseUrl).dialect;
+
+export const createPoolFromConfig = async (databaseUrl?: string): Promise<SlonikDatabasePool> => {
+  const resolvedUrl = databaseUrl ?? (await getDatabaseUrlFromConfig());
+  assert(parseDatabaseUrl(resolvedUrl).database, new Error('Database name is required in URL'));
+
+  const pool = await createDatabasePool(resolvedUrl, getPoolOptions());
+
+  return pool as SlonikDatabasePool;
+};
+
+const createMariaDatabaseIfNeeded = async (databaseUrl: string) => {
+  const parsed = parseDatabaseUrl(databaseUrl);
+  const maintenanceUrl = databaseUrl.replace(`/${parsed.database}`, '/mysql');
+  const maintenancePool = await createDatabasePool(maintenanceUrl, getPoolOptions());
+
+  if ('dialect' in maintenancePool && maintenancePool.dialect === 'mariadb') {
+    await (maintenancePool as import('@logto/database').MariaDatabasePool).query(
+      `CREATE DATABASE IF NOT EXISTS \`${parsed.database.replaceAll('`', '``')}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    );
+    await maintenancePool.end();
+    consoleLog.succeed(`Created database ${parsed.database}`);
+    return;
+  }
+
+  await maintenancePool.end();
 };
 
 /**
  * Create a database pool with the URL in CLI config; if no URL found, prompt to input.
- * If the given database does not exists, it will try to create a new database by connecting to the maintenance database `postgres`.
- *
- * @returns A new database pool with the database URL in config.
+ * If the given database does not exist, create it (Postgres or MariaDB).
  */
 export const createPoolAndDatabaseIfNeeded = async () => {
+  const databaseUrl = await getDatabaseUrlFromConfig();
+
   try {
-    return await createPoolFromConfig();
+    return await createPoolFromConfig(databaseUrl);
   } catch (error: unknown) {
-    // Database does not exist, try to create one
+    const { dialect } = parseDatabaseUrl(databaseUrl);
+
+    if (dialect === DatabaseDialect.MariaDB) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error.code === 'ER_BAD_DB_ERROR' || error.code === 'ER_ACCESS_DENIED_ERROR')
+      ) {
+        await createMariaDatabaseIfNeeded(databaseUrl);
+        return createPoolFromConfig(databaseUrl);
+      }
+
+      consoleLog.fatal(error);
+    }
+
     // https://www.postgresql.org/docs/14/errcodes-appendix.html
     if (!(error instanceof DatabaseError && error.code === '3D000')) {
       consoleLog.fatal(error);
     }
 
-    const databaseUrl = await getDatabaseUrlFromConfig();
     const dsn = parseDsn(databaseUrl);
-    // It's ok to fall back to '?' since:
-    // - Database name is required to connect in the previous pool
-    // - It will throw error when creating database using '?'
     const databaseName = dsn.databaseName ?? '?';
-    const maintenancePool = await createPool(stringifyDsn({ ...dsn, databaseName: 'postgres' }), {
-      interceptors: createInterceptorsPreset(),
-      ...(databaseStatementTimeout === undefined
-        ? {}
-        : { statementTimeout: databaseStatementTimeout }),
-    });
+    const maintenancePool = await createPostgresPool(
+      stringifyDsn({ ...dsn, databaseName: 'postgres' }),
+      getPoolOptions()
+    );
     await maintenancePool.query(sql`
       create database ${sql.identifier([databaseName])}
         with
@@ -75,7 +110,7 @@ export const createPoolAndDatabaseIfNeeded = async () => {
 
     consoleLog.succeed(`Created database ${databaseName}`);
 
-    return createPoolFromConfig();
+    return createPoolFromConfig(databaseUrl);
   }
 };
 

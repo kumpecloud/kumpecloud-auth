@@ -38,13 +38,23 @@ Key environment variables:
 | `POSTGRES_PASSWORD` | `PROD_AUTH_POSTGRES_PASSWORD` secret | DB password |
 | `AUTH_ENDPOINT` | `PROD_AUTH_ENDPOINT` secret | Public OIDC URL (`https://auth.kumpe.app`) |
 | `ADMIN_ENDPOINT` | `PROD_AUTH_ADMIN_ENDPOINT` secret | Admin console URL |
-| `DB_URL` | Composed from postgres password | Internal connection string |
+| `DB_URL` | Composed from postgres password | Internal connection string (`postgres://` or `mariadb://` after cutover) |
 | `TRUST_PROXY_HEADER` | `1` | Behind Caddy |
 | `DEV_FEATURES_ENABLED` | `1` | Unreleased OSS features |
 | `SECRET_VAULT_KEK` | `PROD_SECRET_VAULT_KEK` | Secret vault encryption |
 | `PRIVATE_KEY_ROTATION_GRACE_PERIOD` | optional | OIDC key rotation |
 
-Startup entrypoint:
+See [docs/mariadb-migration.md](../../../docs/mariadb-migration.md) for Postgres → MariaDB cutover (Issue #99).
+
+## MariaDB cutover (staging / production)
+
+1. Deploy MariaDB alongside Postgres (see `mariadb` service in stage compose).
+2. Seed + deploy MariaDB alterations: `pnpm cli db alteration deploy latest --dialect mariadb`
+3. Migrate data: `pnpm cli db migrate --from "$PG_URL" --to "$MARIADB_URL" --dry-run`
+4. Switch `DB_URL` to `mariadb://logto:PASSWORD@mariadb:3306/logto`
+5. Smoke test OIDC + Console; keep Postgres read-only backup
+
+## Startup entrypoint
 
 ```bash
 npm run cli db seed -- --swe --dapc && \

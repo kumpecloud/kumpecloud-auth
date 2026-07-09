@@ -1,4 +1,5 @@
 import type { GeneratedSchema, SchemaLike } from '@logto/schemas';
+import { asSqlFragment, DatabaseDialect, getQueryDialectFromUrl } from '@logto/database';
 import { has } from '@silverhand/essentials';
 import type { CommonQueryMethods, IdentifierSqlToken } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
@@ -74,6 +75,8 @@ export const buildInsertIntoWithPool =
     const returning = Boolean(config?.returning);
     const onConflict = config?.onConflict;
 
+    const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
+
     return async (data: OmitAutoSetFields<CreateSchema>): Promise<Schema | void> => {
       const insertingKeys = keys.filter((key) => has(data, key));
       const {
@@ -87,18 +90,19 @@ export const buildInsertIntoWithPool =
           insertingKeys.map((key) => convertToPrimitiveOrSql(key, data[key] ?? null)),
           sql`, `
         )})
-        ${conditionalSql(onConflict, (config) =>
-          config.ignore
-            ? sql`
-              on conflict do nothing
-            `
-            : sql`
-              on conflict (${sql.join(config.fields, sql`, `)}) do update
-              set ${setExcluded(...config.setExcludedFields)}
-            `
-        )}
-        ${conditionalSql(returning, () => sql`returning *`)}
+        ${asSqlFragment(queryDialect.buildOnConflictClause(onConflict))}
+        ${asSqlFragment(queryDialect.buildReturningClause(returning))}
       `);
+
+      if (returning && queryDialect.dialect === DatabaseDialect.MariaDB && !entry && 'id' in data) {
+        const { rows: [selected] } = await pool.query<Schema>(sql`
+          select * from ${table} where ${fields.id} = ${String(data.id)}
+        `);
+
+        assertThat(selected, new InsertionError<Key, CreateSchema, Schema>(schema, data));
+
+        return selected;
+      }
 
       assertThat(!returning || entry, new InsertionError<Key, CreateSchema, Schema>(schema, data));
 
@@ -130,6 +134,7 @@ export const buildBatchInsertIntoWithPool =
     const keys = excludeAutoSetFields(fieldKeys);
     const returning = Boolean(config?.returning);
     const onConflict = config?.onConflict;
+    const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
 
     return async (
       data: ReadonlyArray<OmitAutoSetFields<CreateSchema>>
@@ -157,14 +162,8 @@ export const buildBatchInsertIntoWithPool =
           sql`, `
         )})
         values ${sql.join(valuesTuples, sql`, `)}
-        ${conditionalSql(onConflict, (conflictConfig) =>
-          conflictConfig.ignore
-            ? sql`on conflict do nothing`
-            : sql`on conflict (${sql.join(conflictConfig.fields, sql`, `)}) do update set ${setExcluded(
-                ...conflictConfig.setExcludedFields
-              )}`
-        )}
-        ${conditionalSql(returning, () => sql`returning *`)}
+        ${asSqlFragment(queryDialect.buildOnConflictClause(onConflict))}
+        ${asSqlFragment(queryDialect.buildReturningClause(returning))}
       `);
 
       if (returning) {

@@ -17,6 +17,7 @@ MOCK_MESSAGE_DIR="${REPO_ROOT}/.integration-test-tmp"
 COVERAGE_DIR="${REPO_ROOT}/.integration-test-coverage"
 
 echo "[run] starting ${TARGET} integration test with run id: ${RUN_ID}"
+echo "[run] DB_URL=${DB_URL:-postgres://postgres:p0stgr3s@postgres:5432/postgres}"
 
 if [ "${COVERAGE:-0}" = "1" ]; then
   echo "[run] coverage is enabled"
@@ -28,6 +29,7 @@ mkdir -p "$LOG_DIR"
 dump_logs() {
   docker compose -f "$COMPOSE_FILE" logs logto > "${LOG_PREFIX}-logto.log" 2>&1 || true
   docker compose -f "$COMPOSE_FILE" logs postgres > "${LOG_PREFIX}-postgres.log" 2>&1 || true
+  docker compose -f "$COMPOSE_FILE" logs mariadb > "${LOG_PREFIX}-mariadb.log" 2>&1 || true
   docker compose -f "$COMPOSE_FILE" logs redis > "${LOG_PREFIX}-redis.log" 2>&1 || true
 }
 
@@ -49,6 +51,7 @@ cleanup() {
     echo "[run] log files:"
     echo "[run]   ${LOG_PREFIX}-logto.log"
     echo "[run]   ${LOG_PREFIX}-postgres.log"
+    echo "[run]   ${LOG_PREFIX}-mariadb.log"
     echo "[run]   ${LOG_PREFIX}-redis.log"
   fi
 
@@ -82,6 +85,9 @@ else
 fi
 
 docker compose -f "$COMPOSE_FILE" up "${COMPOSE_UP_ARGS[@]}"
+
+# Export DB_URL for integration tests (postgres default; set DB_URL=mariadb://logto:p0stgr3s@mariadb:3306/logto for MariaDB matrix)
+export DB_URL="${DB_URL:-postgres://postgres:p0stgr3s@postgres:5432/postgres}"
 
 # Build and run the integration tests
 cd "${REPO_ROOT}/packages/integration-tests"

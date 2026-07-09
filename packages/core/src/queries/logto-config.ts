@@ -17,6 +17,7 @@ import {
   amemberSyncStoredConfigGuard,
   type AMemberSyncStoredConfig,
 } from '@logto/schemas';
+import { asSqlFragment, buildJsonCoalesceMerge, DatabaseDialect, getQueryDialectFromUrl } from '@logto/database';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 import { type z } from 'zod';
@@ -32,6 +33,13 @@ export const createLogtoConfigQueries = (
   pool: CommonQueryMethods,
   wellKnownCache: WellKnownCache
 ) => {
+  const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
+  const logtoConfigUpsertConflict = asSqlFragment(
+    queryDialect.buildOnConflictClause({
+      fields: [fields.tenantId, fields.key],
+      setExcludedFields: [fields.value],
+    })
+  );
   const upsertPrivateSigningKeysWithExecutor = async (
     executor: CommonQueryMethods,
     privateKeys: OidcPrivateKey[]
@@ -39,9 +47,7 @@ export const createLogtoConfigQueries = (
     executor.one<{ key: LogtoOidcConfigKey.PrivateKeys; value: unknown }>(sql`
       insert into ${table} (${fields.key}, ${fields.value})
         values (${LogtoOidcConfigKey.PrivateKeys}, ${sql.jsonb(privateKeys)})
-        on conflict (${fields.tenantId}, ${fields.key}) do update set ${fields.value} = ${sql.jsonb(
-          privateKeys
-        )}
+        ${logtoConfigUpsertConflict}
         returning ${fields.key}, ${fields.value}
     `);
 
@@ -57,7 +63,7 @@ export const createLogtoConfigQueries = (
   const updateAdminConsoleConfig = async (value: Partial<AdminConsoleData>) =>
     pool.one<{ value: unknown }>(sql`
       update ${table}
-      set ${fields.value} = coalesce(${fields.value},'{}'::jsonb) || ${sql.jsonb(value)}
+      set ${fields.value} = ${buildJsonCoalesceMerge(fields.value, sql.jsonb(value), queryDialect.dialect)}
       where ${fields.key} = ${LogtoTenantConfigKey.AdminConsole}
       returning ${fields.value}
     `);
@@ -125,8 +131,7 @@ export const createLogtoConfigQueries = (
     executor.one<{ value: SigningKeyRotationState }>(sql`
       insert into ${table} (${fields.key}, ${fields.value})
         values (${LogtoTenantConfigKey.SigningKeyRotationState}, ${sql.jsonb(value)})
-        on conflict (${fields.tenantId}, ${fields.key}) do update
-        set ${fields.value} = ${sql.jsonb(value)}
+        ${logtoConfigUpsertConflict}
         returning ${fields.value}
     `);
 
@@ -148,7 +153,7 @@ export const createLogtoConfigQueries = (
     pool.query(sql`
       insert into ${table} (${fields.key}, ${fields.value})
         values (${key}, ${sql.jsonb(value)})
-        on conflict (${fields.tenantId}, ${fields.key}) do update set ${fields.value} = ${sql.jsonb(value)}
+        ${logtoConfigUpsertConflict}
         returning *
     `);
 
@@ -166,16 +171,22 @@ export const createLogtoConfigQueries = (
   const setTenantCacheExpiresAt = async (
     tenantCacheExpiresAt: number
   ): Promise<SigningKeyRotationState> => {
+    const mergeValue = buildJsonCoalesceMerge(
+      qualifiedValueField,
+      sql.jsonb({ tenantCacheExpiresAt }),
+      queryDialect.dialect
+    );
     const { value: rawValue } = await pool.one<{ value: SigningKeyRotationState }>(sql`
       insert into ${table} (${fields.key}, ${fields.value})
         values (
           ${LogtoTenantConfigKey.SigningKeyRotationState},
           ${sql.jsonb({ tenantCacheExpiresAt })}
         )
-        on conflict (${fields.tenantId}, ${fields.key}) do update
-        set ${fields.value} = coalesce(${qualifiedValueField}, '{}'::jsonb) || ${sql.jsonb({
-          tenantCacheExpiresAt,
-        })}
+        ${
+          queryDialect.dialect === DatabaseDialect.MariaDB
+            ? sql`ON DUPLICATE KEY UPDATE ${fields.value} = ${mergeValue}`
+            : sql`on conflict (${fields.tenantId}, ${fields.key}) do update set ${fields.value} = ${mergeValue}`
+        }
         returning ${fields.value}
     `);
 
@@ -185,16 +196,22 @@ export const createLogtoConfigQueries = (
   const setSigningKeyRotationAt = async (
     signingKeyRotationAt: number
   ): Promise<SigningKeyRotationState> => {
+    const mergeValue = buildJsonCoalesceMerge(
+      qualifiedValueField,
+      sql.jsonb({ signingKeyRotationAt }),
+      queryDialect.dialect
+    );
     const { value: rawValue } = await pool.one<{ value: SigningKeyRotationState }>(sql`
       insert into ${table} (${fields.key}, ${fields.value})
         values (
           ${LogtoTenantConfigKey.SigningKeyRotationState},
           ${sql.jsonb({ signingKeyRotationAt })}
         )
-        on conflict (${fields.tenantId}, ${fields.key}) do update
-        set ${fields.value} = coalesce(${qualifiedValueField}, '{}'::jsonb) || ${sql.jsonb({
-          signingKeyRotationAt,
-        })}
+        ${
+          queryDialect.dialect === DatabaseDialect.MariaDB
+            ? sql`ON DUPLICATE KEY UPDATE ${fields.value} = ${mergeValue}`
+            : sql`on conflict (${fields.tenantId}, ${fields.key}) do update set ${fields.value} = ${mergeValue}`
+        }
         returning ${fields.value}
     `);
 
@@ -210,9 +227,7 @@ export const createLogtoConfigQueries = (
       sql`
         insert into ${table} (${fields.key}, ${fields.value})
           values (${key}, ${sql.jsonb(value)})
-          on conflict (${fields.tenantId}, ${fields.key}) do update set ${
-            fields.value
-          } = ${sql.jsonb(value)}
+          ${logtoConfigUpsertConflict}
           returning *
       `
     );

@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
 import type { AlterationScript } from '@logto/schemas/lib/types/alteration.js';
 import { conditionalString } from '@silverhand/essentials';
 import type { CommonQueryMethods, DatabasePool } from '@silverhand/slonik';
@@ -29,8 +30,8 @@ const importAlterationScript = async (filePath: string): Promise<AlterationScrip
   return module.default as AlterationScript;
 };
 
-export const getLatestAlterationTimestamp = async () => {
-  const files = await getAlterationFiles();
+export const getLatestAlterationTimestamp = async (dialect?: DatabaseDialect) => {
+  const files = await getAlterationFiles(dialect);
   const lastFile = files.at(-1);
 
   if (!lastFile) {
@@ -42,11 +43,12 @@ export const getLatestAlterationTimestamp = async () => {
 
 export const getAvailableAlterations = async (
   pool: CommonQueryMethods,
-  compareMode: 'gt' | 'lte' = 'gt'
+  compareMode: 'gt' | 'lte' = 'gt',
+  dialect?: DatabaseDialect
 ) => {
-  const databaseTimestamp = await getCurrentDatabaseAlterationTimestamp(pool);
+  const databaseTimestamp = await getCurrentDatabaseAlterationTimestamp(pool, dialect);
 
-  const files = await getAlterationFiles();
+  const files = await getAlterationFiles(dialect);
 
   return files.filter(({ filename }) =>
     compareMode === 'gt'
@@ -64,7 +66,8 @@ export const getAvailableAlterations = async (
 const deployAlteration = async (
   pool: DatabasePool,
   { path: filePath, filename }: AlterationFile,
-  action: 'up' | 'down' = 'up'
+  action: 'up' | 'down' = 'up',
+  dialect?: DatabaseDialect
 ) => {
   const { up, down, beforeUp, beforeDown } = await importAlterationScript(filePath);
   const timestamp = getTimestampFromFilename(filename);
@@ -77,7 +80,7 @@ const deployAlteration = async (
 
       await pool.transaction(async (connection) => {
         await up(connection);
-        await updateDatabaseTimestamp(connection, timestamp);
+        await updateDatabaseTimestamp(connection, timestamp, dialect);
       });
     }
 
@@ -92,7 +95,7 @@ const deployAlteration = async (
         const newTimestamp = timestamp - 1;
 
         if (newTimestamp > 0) {
-          await updateDatabaseTimestamp(connection, newTimestamp);
+          await updateDatabaseTimestamp(connection, newTimestamp, dialect);
         }
       });
     }
@@ -122,7 +125,11 @@ const deployAlteration = async (
   consoleLog.info(`Run alteration ${filename} \`${action}()\` function succeeded`);
 };
 
-const revertAlterations = async (alterations: AlterationFile[], pool: DatabasePool) => {
+const revertAlterations = async (
+  alterations: AlterationFile[],
+  pool: DatabasePool,
+  dialect?: DatabaseDialect
+) => {
   consoleLog.info(
     `Found ${alterations.length} alteration${conditionalString(
       alterations.length > 1 && 's'
@@ -133,15 +140,23 @@ const revertAlterations = async (alterations: AlterationFile[], pool: DatabasePo
   // eslint-disable-next-line @silverhand/fp/no-mutating-methods
   for (const alteration of alterations.slice().reverse()) {
     // eslint-disable-next-line no-await-in-loop
-    await deployAlteration(pool, alteration, 'down');
+    await deployAlteration(pool, alteration, 'down', dialect);
   }
 };
 
-const alteration: CommandModule<unknown, { action: string; target?: string }> = {
+const alteration: CommandModule<
+  unknown,
+  { action: string; target?: string; dialect?: string }
+> = {
   command: ['alteration <action> [target]', 'alt', 'alter'],
   describe: 'Perform database alteration',
   builder: (yargs) =>
     yargs
+      .option('dialect', {
+        describe: 'Database dialect (postgres or mariadb). Defaults from DB_URL.',
+        type: 'string',
+        choices: ['postgres', 'mariadb'],
+      })
       .positional('action', {
         describe: 'The action to perform, accepts `list`, `deploy`, and `rollback` (or `r`).',
         type: 'string',
@@ -152,10 +167,17 @@ const alteration: CommandModule<unknown, { action: string; target?: string }> = 
         type: 'string',
       }),
 
-  handler: async ({ action, target }) => {
+  handler: async ({ action, target, dialect: dialectArg }) => {
+    const dialect =
+      dialectArg === 'mariadb'
+        ? DatabaseDialect.MariaDB
+        : dialectArg === 'postgres'
+          ? DatabaseDialect.Postgres
+          : getDatabaseDialectFromUrl(process.env.DB_URL ?? '');
+
     switch (action) {
       case 'list': {
-        const files = await getAlterationFiles();
+        const files = await getAlterationFiles(dialect);
 
         for (const file of files) {
           consoleLog.plain(file.filename);
@@ -166,7 +188,7 @@ const alteration: CommandModule<unknown, { action: string; target?: string }> = 
       case 'deploy': {
         const pool = await createPoolFromConfig();
         const alterations = await chooseAlterationsByVersion(
-          await getAvailableAlterations(pool),
+          await getAvailableAlterations(pool, 'gt', dialect),
           target
         );
 
@@ -179,7 +201,7 @@ const alteration: CommandModule<unknown, { action: string; target?: string }> = 
         // The await inside the loop is intended, alterations should run in order
         for (const alteration of alterations) {
           // eslint-disable-next-line no-await-in-loop
-          await deployAlteration(pool, alteration);
+          await deployAlteration(pool, alteration, 'up', dialect);
         }
 
         await pool.end();
@@ -190,11 +212,11 @@ const alteration: CommandModule<unknown, { action: string; target?: string }> = 
       case 'r': {
         const pool = await createPoolFromConfig();
         const alterations = await chooseRevertAlterationsByVersion(
-          await getAvailableAlterations(pool, 'lte'),
+          await getAvailableAlterations(pool, 'lte', dialect),
           target ?? ''
         );
 
-        await revertAlterations(alterations, pool);
+        await revertAlterations(alterations, pool, dialect);
         await pool.end();
         break;
       }
@@ -202,7 +224,7 @@ const alteration: CommandModule<unknown, { action: string; target?: string }> = 
         const pool = await createPoolFromConfig();
         const alterations = await chooseRevertAlterationsByTimestamp(target ?? '');
 
-        await revertAlterations(alterations, pool);
+        await revertAlterations(alterations, pool, dialect);
         await pool.end();
         break;
       }

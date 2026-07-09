@@ -17,6 +17,15 @@ Use this skill whenever a task depends on a working local Logto stack. Creating 
    export DB_URL="postgres://postgres:p0stgr3s@localhost:5432/logto"
    ```
 
+   For MariaDB development (Issue #99):
+
+   ```bash
+   docker compose -f docker-compose.mariadb.yml up -d
+   export DB_URL="mariadb://logto:p0stgr3s@localhost:3306/logto"
+   pnpm cli db seed
+   pnpm cli db alteration deploy latest --dialect mariadb
+   ```
+
 4. Install/build only what is needed, seed the database, then run:
 
    ```bash

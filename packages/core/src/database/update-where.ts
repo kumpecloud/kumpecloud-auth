@@ -1,4 +1,5 @@
 import type { SchemaLike, GeneratedSchema, SchemaValue } from '@logto/schemas';
+import { asSqlFragment, DatabaseDialect, getQueryDialectFromUrl } from '@logto/database';
 import type { UpdateWhereData } from '@logto/shared';
 import type { Truthy } from '@silverhand/essentials';
 import { notFalsy } from '@silverhand/essentials';
@@ -8,7 +9,7 @@ import { sql } from '@silverhand/slonik';
 import { UpdateError } from '#src/errors/SlonikError/index.js';
 import assertThat from '#src/utils/assert-that.js';
 import { isKeyOf } from '#src/utils/schema.js';
-import { convertToIdentifiers, convertToPrimitiveOrSql, conditionalSql } from '#src/utils/sql.js';
+import { convertToIdentifiers, convertToPrimitiveOrSql } from '#src/utils/sql.js';
 
 type BuildUpdateWhere = {
   <
@@ -45,6 +46,8 @@ export const buildUpdateWhereWithPool =
   ) => {
     const { table, fields } = convertToIdentifiers(schema);
     const isKeyOfSchema = isKeyOf(schema);
+    const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
+
     const connectKeyValueWithEqualSign = <ConnectKey extends Key>(
       data: Partial<SchemaLike<ConnectKey>>,
       jsonbMode: 'replace' | 'merge'
@@ -61,15 +64,11 @@ export const buildUpdateWhereWithPool =
             typeof value === 'object' &&
             !Array.isArray(value)
           ) {
-            /**
-             * Jsonb || operator is used to shallow merge two jsonb types of data
-             * all jsonb data field must be non-nullable
-             * https://www.postgresql.org/docs/current/functions-json.html
-             */
-            return sql`
-              ${fields[key]}=
-                coalesce(${fields[key]},'{}'::jsonb) || ${convertToPrimitiveOrSql(key, value)}
-            `;
+            return queryDialect.buildJsonMergeExpression(
+              fields[key],
+              convertToPrimitiveOrSql(key, value),
+              'merge'
+            );
           }
 
           return sql`${fields[key]}=${convertToPrimitiveOrSql(key, value)}`;
@@ -81,14 +80,26 @@ export const buildUpdateWhereWithPool =
       where,
       jsonbMode,
     }: UpdateWhereData<SetKey, WhereKey>) => {
+      const whereConditions = connectKeyValueWithEqualSign(where, jsonbMode);
       const {
         rows: [data],
       } = await pool.query<Schema>(sql`
         update ${table}
         set ${sql.join(connectKeyValueWithEqualSign(set, jsonbMode), sql`, `)}
-        where ${sql.join(connectKeyValueWithEqualSign(where, jsonbMode), sql` and `)}
-        ${conditionalSql(returning, () => sql`returning *`)}
+        where ${sql.join(whereConditions, sql` and `)}
+        ${asSqlFragment(queryDialect.buildReturningClause(returning))}
       `);
+
+      if (returning && queryDialect.dialect === DatabaseDialect.MariaDB && !data) {
+        const { rows: [selected] } = await pool.query<Schema>(sql`
+          select * from ${table}
+          where ${sql.join(whereConditions, sql` and `)}
+        `);
+
+        assertThat(selected, new UpdateError(schema, { set, where, jsonbMode }));
+
+        return selected;
+      }
 
       assertThat(!returning || data, new UpdateError(schema, { set, where, jsonbMode }));
 

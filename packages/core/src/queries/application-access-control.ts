@@ -10,6 +10,7 @@ import {
   OrganizationUserRelations,
   UsersRoles,
 } from '@logto/schemas';
+import { DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
@@ -40,53 +41,93 @@ const organizationUserRelations = convertToIdentifiers(OrganizationUserRelations
 const organizationRoleUserRelations = convertToIdentifiers(OrganizationRoleUserRelations, true);
 
 export const createApplicationAccessControlQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
+
   const findApplicationAccessControl = async (
     applicationId: string
   ): Promise<ApplicationAccessControl> => {
-    const accessControl = await pool.one<ApplicationAccessControl>(sql`
-      select
-        coalesce((
-          select array_agg(${userRelations.fields.userId} order by ${userRelations.fields.userId})
-          from ${userRelations.table}
-          where ${userRelations.fields.applicationId} = ${applicationId}
-        ), array[]::varchar[]) as "userIds",
-        coalesce((
-          select array_agg(
-            ${userRoleRelations.fields.roleId}
-            order by ${userRoleRelations.fields.roleId}
-          )
-          from ${userRoleRelations.table}
-          where ${userRoleRelations.fields.applicationId} = ${applicationId}
-        ), array[]::varchar[]) as "userRoleIds",
-        coalesce((
-          select array_agg(
-            ${organizationRelations.fields.organizationId}
-            order by ${organizationRelations.fields.organizationId}
-          )
-          from ${organizationRelations.table}
-          where ${organizationRelations.fields.applicationId} = ${applicationId}
-        ), array[]::varchar[]) as "organizationIds",
-        coalesce((
-          select jsonb_agg(
-            jsonb_build_object(
-              'organizationId', organization_id,
-              'organizationRoleIds', organization_role_ids
-            )
-            order by organization_id
-          )
-          from (
+    const accessControl =
+      dialect === DatabaseDialect.MariaDB
+        ? await pool.one<ApplicationAccessControl>(sql`
             select
-              ${organizationRoleRelations.fields.organizationId} as organization_id,
-              array_agg(
-                ${organizationRoleRelations.fields.organizationRoleId}
-                order by ${organizationRoleRelations.fields.organizationRoleId}
-              ) as organization_role_ids
-            from ${organizationRoleRelations.table}
-            where ${organizationRoleRelations.fields.applicationId} = ${applicationId}
-            group by ${organizationRoleRelations.fields.organizationId}
-          ) organization_role_rules
-        ), '[]'::jsonb) as "organizationRoleRules"
-    `);
+              coalesce((
+                select JSON_ARRAYAGG(${userRelations.fields.userId})
+                from ${userRelations.table}
+                where ${userRelations.fields.applicationId} = ${applicationId}
+              ), JSON_ARRAY()) as userIds,
+              coalesce((
+                select JSON_ARRAYAGG(${userRoleRelations.fields.roleId})
+                from ${userRoleRelations.table}
+                where ${userRoleRelations.fields.applicationId} = ${applicationId}
+              ), JSON_ARRAY()) as userRoleIds,
+              coalesce((
+                select JSON_ARRAYAGG(${organizationRelations.fields.organizationId})
+                from ${organizationRelations.table}
+                where ${organizationRelations.fields.applicationId} = ${applicationId}
+              ), JSON_ARRAY()) as organizationIds,
+              coalesce((
+                select JSON_ARRAYAGG(
+                  JSON_OBJECT(
+                    'organizationId', organization_id,
+                    'organizationRoleIds', organization_role_ids
+                  )
+                )
+                from (
+                  select
+                    ${organizationRoleRelations.fields.organizationId} as organization_id,
+                    JSON_ARRAYAGG(
+                      ${organizationRoleRelations.fields.organizationRoleId}
+                    ) as organization_role_ids
+                  from ${organizationRoleRelations.table}
+                  where ${organizationRoleRelations.fields.applicationId} = ${applicationId}
+                  group by ${organizationRoleRelations.fields.organizationId}
+                ) organization_role_rules
+              ), JSON_ARRAY()) as organizationRoleRules
+          `)
+        : await pool.one<ApplicationAccessControl>(sql`
+            select
+              coalesce((
+                select array_agg(${userRelations.fields.userId} order by ${userRelations.fields.userId})
+                from ${userRelations.table}
+                where ${userRelations.fields.applicationId} = ${applicationId}
+              ), array[]::varchar[]) as "userIds",
+              coalesce((
+                select array_agg(
+                  ${userRoleRelations.fields.roleId}
+                  order by ${userRoleRelations.fields.roleId}
+                )
+                from ${userRoleRelations.table}
+                where ${userRoleRelations.fields.applicationId} = ${applicationId}
+              ), array[]::varchar[]) as "userRoleIds",
+              coalesce((
+                select array_agg(
+                  ${organizationRelations.fields.organizationId}
+                  order by ${organizationRelations.fields.organizationId}
+                )
+                from ${organizationRelations.table}
+                where ${organizationRelations.fields.applicationId} = ${applicationId}
+              ), array[]::varchar[]) as "organizationIds",
+              coalesce((
+                select jsonb_agg(
+                  jsonb_build_object(
+                    'organizationId', organization_id,
+                    'organizationRoleIds', organization_role_ids
+                  )
+                  order by organization_id
+                )
+                from (
+                  select
+                    ${organizationRoleRelations.fields.organizationId} as organization_id,
+                    array_agg(
+                      ${organizationRoleRelations.fields.organizationRoleId}
+                      order by ${organizationRoleRelations.fields.organizationRoleId}
+                    ) as organization_role_ids
+                  from ${organizationRoleRelations.table}
+                  where ${organizationRoleRelations.fields.applicationId} = ${applicationId}
+                  group by ${organizationRoleRelations.fields.organizationId}
+                ) organization_role_rules
+              ), '[]'::jsonb) as "organizationRoleRules"
+          `);
 
     return applicationAccessControlGuard.parse(accessControl);
   };

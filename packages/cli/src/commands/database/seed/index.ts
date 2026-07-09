@@ -1,4 +1,5 @@
 import type { DatabasePool } from '@silverhand/slonik';
+import { getDatabaseDialectFromUrl } from '@logto/database';
 import type { CommandModule } from 'yargs';
 
 import { createPoolAndDatabaseIfNeeded } from '../../../database.js';
@@ -27,8 +28,9 @@ export const seedByPool = async (
   }: SeedByPoolOptions = {}
 ) => {
   await pool.transaction(async (connection) => {
+    const dialect = getDatabaseDialectFromUrl(process.env.DB_URL ?? '');
     // Check alteration scripts available in order to insert correct timestamp
-    const latestTimestamp = await getLatestAlterationTimestamp();
+    const latestTimestamp = await getLatestAlterationTimestamp(dialect);
 
     if (latestTimestamp < 1) {
       throw new Error(
@@ -37,7 +39,7 @@ export const seedByPool = async (
       );
     }
 
-    const tableInfo = await oraPromise(createTables(connection, encryptBaseRole), {
+    const tableInfo = await oraPromise(createTables(connection, encryptBaseRole, dialect), {
       text: 'Create tables',
     });
 

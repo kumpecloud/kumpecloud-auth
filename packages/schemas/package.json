@@ -8,7 +8,10 @@
     "lib",
     "alterations",
     "alterations-js",
-    "tables"
+    "alterations-mariadb",
+    "alterations-mariadb-js",
+    "tables",
+    "tables-mariadb"
   ],
   "main": "./lib/index.js",
   "exports": {
@@ -24,8 +27,10 @@
     "precommit": "lint-staged",
     "version": "./update-next.sh && git add alterations/",
     "generate": "./generate.sh",
+    "generate:mariadb": "TABLES_DIR=tables-mariadb pnpm generate",
     "build:alterations": "rm -rf alterations-js && tsc -p tsconfig.build.alterations.json",
-    "build": "pnpm generate && rm -rf lib/ && tsc -p tsconfig.build.json && pnpm build:alterations",
+    "build:alterations-mariadb": "rm -rf alterations-mariadb-js && tsc -p tsconfig.build.alterations-mariadb.json",
+    "build": "pnpm generate && rm -rf lib/ && tsc -p tsconfig.build.json && pnpm build:alterations && pnpm build:alterations-mariadb",
     "build:test": "pnpm build",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput --incremental",
     "lint": "eslint --ext .ts src",

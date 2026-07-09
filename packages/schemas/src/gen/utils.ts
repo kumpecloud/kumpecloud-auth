@@ -154,7 +154,8 @@ export const getType = (
     case 'oid':
     case 'date':
     case 'timestamp':
-    case 'timestamptz': {
+    case 'timestamptz':
+    case 'datetime': {
       return 'number';
     }
 

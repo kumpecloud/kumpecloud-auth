@@ -1,5 +1,6 @@
 import type { Application, OidcModelInstance, OidcModelInstancePayload } from '@logto/schemas';
 import { Applications, OidcModelInstances } from '@logto/schemas';
+import { buildGrantIdInAuthorizationsExists, getDatabaseDialectFromEnv } from '@logto/database';
 import type { Nullable } from '@silverhand/essentials';
 import { conditional } from '@silverhand/essentials';
 import type { CommonQueryMethods, ValueExpression } from '@silverhand/slonik';
@@ -64,6 +65,7 @@ const findByModel = (modelName: string) => sql`
 `;
 
 export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
   const upsertInstance = buildInsertIntoWithPool(pool)(OidcModelInstances, {
     onConflict: {
       fields: [fields.tenantId, fields.modelName, fields.id],
@@ -283,11 +285,7 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
       where ${fields.modelName} = ${sessionModelName}
         and ${fields.payload} ->> 'accountId' = ${accountId}
         and ${fields.expiresAt} > ${convertToTimestamp()}
-        and exists (
-          select 1
-          from jsonb_each(${fields.payload} -> 'authorizations') as authorization_entry
-          where authorization_entry.value ->> 'grantId' = ${grantId}
-        )
+        and ${buildGrantIdInAuthorizationsExists(fields.payload, grantId, dialect)}
       limit 1
     `);
   };

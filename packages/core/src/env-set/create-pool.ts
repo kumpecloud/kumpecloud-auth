@@ -1,13 +1,12 @@
-import { assert, conditional, trySafe } from '@silverhand/essentials';
 import {
-  createMockPool,
-  createMockQueryResult,
-  createPool,
-  sql,
-  parseDsn,
-  createInterceptorsPreset,
+  createDatabasePool,
+  createMockPostgresPool,
+  ensureDatabasePoolReady,
+  parseDatabaseUrl,
   type DatabasePool,
-} from '@silverhand/slonik';
+  type PoolLike,
+} from '@logto/database';
+import { assert, conditional, trySafe } from '@silverhand/essentials';
 import pRetry, { AbortError } from 'p-retry';
 
 const databaseConnectionRetries = 5;
@@ -19,8 +18,6 @@ const transientConnectionErrorCodes = new Set([
   'EPIPE',
 ]);
 
-type PoolLike = Pick<DatabasePool, 'query' | 'end'>;
-
 const isErrorWithConnectionMetadata = (
   error: unknown
 ): error is {
@@ -28,10 +25,7 @@ const isErrorWithConnectionMetadata = (
   message?: string;
 } => typeof error === 'object' && error !== null;
 
-export const ensurePoolReady = async <T extends PoolLike>(pool: T) => {
-  await pool.query(sql`select 1`);
-  return pool;
-};
+export const ensurePoolReady = ensureDatabasePoolReady;
 
 export const isTransientConnectionError = (error?: unknown) => {
   if (!isErrorWithConnectionMetadata(error)) {
@@ -90,22 +84,23 @@ const createPoolByEnv = async (
   poolSize?: number,
   connectionTimeout?: number,
   statementTimeout?: number | 'DISABLE_TIMEOUT'
-) => {
+): Promise<DatabasePool> => {
   // Database connection is disabled in unit test environment
   if (mockDatabaseConnection) {
-    return createMockPool({ query: async () => createMockQueryResult([]) });
+    return createMockPostgresPool();
   }
 
-  assert(parseDsn(databaseDsn).databaseName, new Error('Database name is required'));
+  assert(parseDatabaseUrl(databaseDsn).database, new Error('Database name is required'));
 
   const poolOptions = {
-    interceptors: createInterceptorsPreset(),
     maximumPoolSize: poolSize,
     connectionTimeout,
     ...conditional(statementTimeout !== undefined && { statementTimeout }),
   };
 
-  return createPoolWithRetry(async () => createPool(databaseDsn, poolOptions));
+  return createPoolWithRetry(async () =>
+    createDatabasePool(databaseDsn, poolOptions)
+  );
 };
 
 export default createPoolByEnv;

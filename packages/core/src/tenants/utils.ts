@@ -7,6 +7,7 @@ import {
 } from '@logto/schemas';
 import { Tenants } from '@logto/schemas/models';
 import { conditional } from '@silverhand/essentials';
+import { DatabaseDialect, getDatabaseDialectFromUrl, type PostgresDatabasePool } from '@logto/database';
 import { parseDsn, sql, stringifyDsn } from '@silverhand/slonik';
 import { z } from 'zod';
 
@@ -24,13 +25,18 @@ const { table: logtoConfigsTable, fields: logtoConfigFields } = convertToIdentif
  */
 export const getTenantDatabaseDsn = async (tenantId: string) => {
   const { sharedPool, dbUrl } = EnvSet;
+
+  if (getDatabaseDialectFromUrl(dbUrl) === DatabaseDialect.MariaDB) {
+    return dbUrl;
+  }
+
   const {
     tableName,
     rawKeys: { id, dbUser, dbUserPassword },
   } = Tenants;
 
   const identifier = (id: string) => sql.identifier([id]);
-  const pool = await sharedPool;
+  const pool = (await sharedPool) as PostgresDatabasePool;
 
   const { rows } = await pool.query(sql`
     select ${identifier(dbUser)}, ${identifier(dbUserPassword)}
@@ -61,7 +67,7 @@ export const getTenantDatabaseDsn = async (tenantId: string) => {
  * admin tenant keys while running in a user tenant whose pool is scoped by RLS.
  */
 export const getAdminTenantPrivateSigningKeys = async (): Promise<OidcPrivateKey[]> => {
-  const pool = await EnvSet.sharedPool;
+  const pool = (await EnvSet.sharedPool) as PostgresDatabasePool;
   const { value } = await pool.one<{ value: unknown }>(sql`
     select ${logtoConfigFields.value} from ${logtoConfigsTable}
       where ${logtoConfigFields.tenantId} = ${adminTenantId}

@@ -3,6 +3,12 @@ import type { Optional } from '@silverhand/essentials';
 import { appendPath } from '@silverhand/essentials';
 import type { DatabasePool } from '@silverhand/slonik';
 import chalk from 'chalk';
+import { adminTenantId } from '@logto/schemas';
+import {
+  DatabaseDialect,
+  getDatabaseDialectFromUrl,
+  wrapPoolWithTenantGuard,
+} from '@logto/database';
 
 import { WellKnownCache } from '#src/caches/well-known.js';
 import { createLogtoConfigLibrary } from '#src/libraries/logto-config.js';
@@ -80,13 +86,20 @@ export class EnvSet {
   }
 
   async load(customDomain?: string) {
-    const pool = await createPoolByEnv(
+    let pool = await createPoolByEnv(
       this.databaseUrl,
       EnvSet.values.isUnitTest,
       EnvSet.values.databasePoolSize,
       EnvSet.values.databaseConnectionTimeout,
       EnvSet.values.databaseStatementTimeout
     );
+
+    if (getDatabaseDialectFromUrl(this.databaseUrl) === DatabaseDialect.MariaDB) {
+      pool = wrapPoolWithTenantGuard(pool, {
+        tenantId: this.tenantId,
+        isAdmin: this.tenantId === adminTenantId,
+      }) as DatabasePool;
+    }
 
     this.#pool = pool;
 

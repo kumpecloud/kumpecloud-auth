@@ -31,11 +31,29 @@ services:
       retries: 10
       start_period: 10s
 
+# Optional MariaDB (Issue #99 cutover): set DB_URL=mariadb://logto:${POSTGRES_PASSWORD}@mariadb:3306/logto
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      MARIADB_DATABASE: logto
+      MARIADB_USER: logto
+      MARIADB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
   kumpecloud-auth:
     image: ghcr.io/kumpecloud/kumpecloud-auth:${KUMPECLOUD_AUTH_TAG:-edge}
     restart: unless-stopped
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
     ports:
       # Caddy reverse-proxies to the VM/Nebula IP on these ports.
@@ -43,7 +61,7 @@ services:
       - '3002:3002'
     environment:
       TRUST_PROXY_HEADER: '1'
-      DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/logto
+      DB_URL: mariadb://logto:${POSTGRES_PASSWORD}@mariadb:3306/logto
       ENDPOINT: https://auth.stage.kumpe.app
       ADMIN_ENDPOINT: https://auth-console.stage.kumpe.app
       ALL_YES: '1'
@@ -54,7 +72,7 @@ services:
     entrypoint:
       - sh
       - -c
-      - npm run cli db seed -- --swe --dapc && npm run cli db alteration deploy latest && npm run cli db alteration deploy next && exec npm start
+      - npm run cli db seed -- --swe --dapc && npm run cli db alteration deploy latest --dialect mariadb && npm run cli db alteration deploy next --dialect mariadb && exec npm start
     healthcheck:
       test:
         [
@@ -70,3 +88,4 @@ services:
 
 volumes:
   postgres_data:
+  mariadb_data:

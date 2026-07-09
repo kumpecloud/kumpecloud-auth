@@ -1,4 +1,5 @@
 import { getAvailableAlterations } from '@logto/cli/lib/commands/database/alteration/index.js';
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
 import { ServiceLogs, Systems } from '@logto/schemas';
 import { ConsoleLog, isKeyInObject } from '@logto/shared';
 import { conditionalString } from '@silverhand/essentials';
@@ -11,7 +12,12 @@ const consoleLog = new ConsoleLog(chalk.magenta('pre'));
 
 export const checkPreconditions = async (pool: DatabasePool) => {
   checkDeprecations();
-  await Promise.all([checkAlterationState(pool), checkRowLevelSecurity(pool)]);
+  const dialect = getDatabaseDialectFromUrl(EnvSet.values.databaseUrl);
+
+  await Promise.all([
+    dialect === DatabaseDialect.Postgres ? checkRowLevelSecurity(pool) : Promise.resolve(),
+    checkAlterationState(pool, dialect),
+  ]);
 };
 
 const checkRowLevelSecurity = async (client: CommonQueryMethods) => {
@@ -37,8 +43,8 @@ const checkRowLevelSecurity = async (client: CommonQueryMethods) => {
   }
 };
 
-const checkAlterationState = async (pool: CommonQueryMethods) => {
-  const alterations = await getAvailableAlterations(pool);
+const checkAlterationState = async (pool: CommonQueryMethods, dialect: DatabaseDialect) => {
+  const alterations = await getAvailableAlterations(pool, 'gt', dialect);
 
   if (alterations.length === 0) {
     return;

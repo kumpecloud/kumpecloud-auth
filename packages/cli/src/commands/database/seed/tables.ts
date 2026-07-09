@@ -1,3 +1,4 @@
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -90,11 +91,15 @@ const lifecycleNames: readonly string[] = Object.freeze([
   'after_each',
 ] satisfies Lifecycle[]);
 
+export const getTablesDirectory = (dialect: DatabaseDialect = getDatabaseDialectFromUrl(process.env.DB_URL ?? '')) =>
+  getPathInModule('@logto/schemas', dialect === DatabaseDialect.MariaDB ? 'tables-mariadb' : 'tables');
+
 export const createTables = async (
   connection: DatabaseTransactionConnection,
-  encryptBaseRole: boolean
+  encryptBaseRole: boolean,
+  dialect: DatabaseDialect = getDatabaseDialectFromUrl(process.env.DB_URL ?? '')
 ): Promise<{ password: string }> => {
-  const tableDirectory = getPathInModule('@logto/schemas', 'tables');
+  const tableDirectory = getTablesDirectory(dialect);
   const directoryFiles = await readdir(tableDirectory);
   const tableFiles = directoryFiles.filter((file) => file.endsWith('.sql'));
   const queries = await Promise.all(

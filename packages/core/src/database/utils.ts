@@ -1,4 +1,5 @@
 import { type GeneratedSchema } from '@logto/schemas';
+import { asSqlFragment, getQueryDialectFromUrl } from '@logto/database';
 import { type SchemaLike, type Table } from '@logto/shared';
 import { type SqlSqlToken, sql } from '@silverhand/slonik';
 
@@ -39,8 +40,11 @@ export const buildSearchSql = <
 
   return conditionalSql(search, (search) => {
     const { fields: searchFields, keyword } = search;
+    const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
+    const pattern = queryDialect.buildSearchKeywordPattern(keyword);
+    const likeOperator = queryDialect.buildLikeOperator(false);
     const searchSql = sql.join(
-      searchFields.map((field) => sql`${fields[field]} ilike ${`%${keyword}%`}`),
+      searchFields.map((field) => sql`${fields[field]} ${asSqlFragment(likeOperator)} ${pattern}`),
       sql` or `
     );
     return sql`${prefixSql}(${searchSql})`;

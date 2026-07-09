@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DatabaseDialect } from '@logto/database';
 import { findPackage } from '@logto/shared';
 
 import { getPathInModule } from '../../../utils.js';
@@ -43,10 +44,16 @@ export const getTimestampFromFilename = (filename: string) => {
   return Number(timestampPart);
 };
 
-export const getAlterationDirectory = () => getPathInModule('@logto/schemas', 'alterations-js');
+export const getAlterationDirectory = (dialect: DatabaseDialect = DatabaseDialect.Postgres) =>
+  getPathInModule(
+    '@logto/schemas',
+    dialect === DatabaseDialect.MariaDB ? 'alterations-mariadb-js' : 'alterations-js'
+  );
 
-export const getAlterationFiles = async (): Promise<AlterationFile[]> => {
-  const alterationDirectory = getAlterationDirectory();
+export const getAlterationFiles = async (
+  dialect: DatabaseDialect = DatabaseDialect.Postgres
+): Promise<AlterationFile[]> => {
+  const alterationDirectory = getAlterationDirectory(dialect);
 
   /**
    * We copy all alteration scripts to the CLI package root directory,

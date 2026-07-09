@@ -17,6 +17,7 @@ import {
 } from '@logto/schemas';
 import { generateStandardId } from '@logto/shared';
 import { assert } from '@silverhand/essentials';
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
 import type { CommonQueryMethods, DatabaseTransactionConnection } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
@@ -24,7 +25,11 @@ import { insertInto } from '../../../database.js';
 import { getDatabaseName } from '../../../queries/database.js';
 import { consoleLog } from '../../../utils.js';
 
-export const createTenant = async (pool: CommonQueryMethods, tenantId: string) => {
+export const createTenant = async (
+  pool: CommonQueryMethods,
+  tenantId: string,
+  dialect: DatabaseDialect = getDatabaseDialectFromUrl(process.env.DB_URL ?? '')
+) => {
   const database = await getDatabaseName(pool, true);
   const { parentRole, role, password } = createTenantDatabaseMetadata(database, tenantId);
   const createTenant = {
@@ -34,6 +39,12 @@ export const createTenant = async (pool: CommonQueryMethods, tenantId: string) =
   };
 
   await pool.query(insertInto(createTenant, 'tenants'));
+
+  if (dialect === DatabaseDialect.MariaDB) {
+    consoleLog.info(`Skipped CREATE ROLE for tenant ${tenantId} (MariaDB uses TenantGuard)`);
+    return;
+  }
+
   await pool.query(sql`
     create role ${sql.identifier([role])} with inherit login
       password '${sql.raw(password)}'

@@ -4,6 +4,7 @@ import {
   type SentinelActivityAction,
   type SentinelActivityTargetType,
 } from '@logto/schemas';
+import { buildInArrayCondition, DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import { buildInsertIntoWithPool } from '../database/insert-into.js';
@@ -20,6 +21,7 @@ type CountActivitiesQuery = {
 };
 
 export const createSentinelActivitiesQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
   /**
    * Insert a sentinel activity row. Reused by both the failure-based sentinel and the
    * message rate guard — the table is a shared activity log.
@@ -44,7 +46,11 @@ export const createSentinelActivitiesQueries = (pool: CommonQueryMethods) => {
         where ${fields.targetType} = ${targetType}
           and ${fields.targetHash} = ${targetHash}
           and ${fields.action} = ${action}
-          and ${fields.createdAt} > now() - make_interval(secs => ${windowSeconds})
+          and ${fields.createdAt} > ${
+            dialect === DatabaseDialect.MariaDB
+              ? sql`DATE_SUB(NOW(), INTERVAL ${windowSeconds} SECOND)`
+              : sql`now() - make_interval(secs => ${windowSeconds})`
+          }
       `)
     );
 
@@ -59,8 +65,12 @@ export const createSentinelActivitiesQueries = (pool: CommonQueryMethods) => {
     return pool.query<SentinelActivity>(sql`
       delete from ${table}
       where ${fields.targetType} = ${targetType}
-        and ${fields.targetHash} = any(${sql.array(targetHashes, 'varchar')})
-        and ${fields.createdAt} > now() - interval '1 hour'
+        and ${buildInArrayCondition(fields.targetHash, targetHashes, dialect)}
+        and ${fields.createdAt} > ${
+          dialect === DatabaseDialect.MariaDB
+            ? sql`DATE_SUB(NOW(), INTERVAL 1 HOUR)`
+            : sql`now() - interval '1 hour'`
+        }
     `);
   };
 
