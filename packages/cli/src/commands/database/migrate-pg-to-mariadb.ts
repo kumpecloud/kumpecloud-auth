@@ -20,6 +20,9 @@ export type MigrationOptions = {
   dryRun?: boolean;
   batchSize?: number;
   tables?: string[];
+  skipTables?: string[];
+  resumeFrom?: string;
+  skipExisting?: boolean;
   force?: boolean;
 };
 
@@ -56,22 +59,6 @@ export const getTableMigrationPlan = async (): Promise<TableMigrationPlan[]> => 
   return plans.sort((a, b) => a.initOrder - b.initOrder || a.table.localeCompare(b.table));
 };
 
-const checksumRows = (rows: ReadonlyArray<Record<string, unknown>>) => {
-  let hash = 0;
-
-  const normalized = rows
-    .map((row) => JSON.stringify(row, Object.keys(row).sort()))
-    .sort();
-
-  for (const entry of normalized) {
-    for (const char of entry) {
-      hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-    }
-  }
-
-  return hash.toString(16);
-};
-
 const transformRow = (row: Record<string, unknown>) => {
   const transformed: Record<string, unknown> = {};
 
@@ -90,6 +77,85 @@ const transformRow = (row: Record<string, unknown>) => {
   }
 
   return transformed;
+};
+
+const normalizeRows = (rows: ReadonlyArray<Record<string, unknown>>) =>
+  rows
+    .map((row) => JSON.stringify(transformRow(row), Object.keys(transformRow(row)).sort()))
+    .sort();
+
+const checksumNormalizedRows = (normalizedRows: readonly string[]) => {
+  let hash = 0;
+
+  for (const entry of normalizedRows) {
+    for (const char of entry) {
+      hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    }
+  }
+
+  return hash.toString(16);
+};
+
+export const checksumRows = (rows: ReadonlyArray<Record<string, unknown>>) =>
+  checksumNormalizedRows(normalizeRows(rows));
+
+export const filterMigrationPlan = (plan: TableMigrationPlan[], options: MigrationOptions) => {
+  let filtered = plan.filter(({ table }) => (options.tables ? options.tables.includes(table) : true));
+
+  if (options.skipTables?.length) {
+    const skip = new Set(options.skipTables);
+    filtered = filtered.filter(({ table }) => !skip.has(table));
+  }
+
+  if (options.resumeFrom) {
+    const resumeIndex = filtered.findIndex(({ table }) => table === options.resumeFrom);
+
+    if (resumeIndex >= 0) {
+      filtered = filtered.slice(resumeIndex);
+    }
+  }
+
+  return filtered;
+};
+
+export const computePaginatedTableChecksum = async (
+  pool: PostgresDatabasePool | MariaDatabasePool,
+  table: string,
+  dialect: DatabaseDialect,
+  pageSize: number
+) => {
+  const normalizedRows: string[] = [];
+  let offset = 0;
+
+  while (true) {
+    const rows =
+      dialect === DatabaseDialect.Postgres
+        ? (
+            await (pool as PostgresDatabasePool).query<Record<string, unknown>>(sql`
+              select * from ${sql.identifier([table])}
+              order by 1
+              limit ${pageSize} offset ${offset}
+            `)
+          ).rows
+        : (
+            await (pool as MariaDatabasePool).query<Record<string, unknown>>(
+              `SELECT * FROM \`${table}\` ORDER BY 1 LIMIT ? OFFSET ?`,
+              [pageSize, offset]
+            )
+          ).rows;
+
+    if (rows.length === 0) {
+      break;
+    }
+
+    normalizedRows.push(...normalizeRows(rows));
+    offset += pageSize;
+  }
+
+  return {
+    count: normalizedRows.length,
+    checksum: checksumNormalizedRows(normalizedRows),
+  };
 };
 
 export class MigrationService {
@@ -140,9 +206,8 @@ export class MigrationService {
     const postgresSource = sourcePool as PostgresDatabasePool;
     const mariaTarget = targetPool as MariaDatabasePool;
 
-    const plan = (await getTableMigrationPlan()).filter(({ table }) =>
-      options.tables ? options.tables.includes(table) : true
-    );
+    const plan = filterMigrationPlan(await getTableMigrationPlan(), options);
+    const pageSize = options.batchSize ?? 500;
 
     if (!options.dryRun) {
       await this.verifyTargetSchema(mariaTarget, plan);
@@ -165,18 +230,48 @@ export class MigrationService {
         continue;
       }
 
-      if (options.force) {
-        await mariaTarget.query(`DELETE FROM \`${table}\``);
-      } else {
-        const { rows: existingRows } = await mariaTarget.query<{ count: number }>(
-          `SELECT COUNT(*) as count FROM \`${table}\``
+      const { rows: existingRows } = await mariaTarget.query<{ count: number }>(
+        `SELECT COUNT(*) as count FROM \`${table}\``
+      );
+      const existingTargetCount = Number(existingRows[0]?.count ?? 0);
+
+      if (options.skipExisting && existingTargetCount > 0) {
+        const sourceChecksum = await computePaginatedTableChecksum(
+          postgresSource,
+          table,
+          DatabaseDialect.Postgres,
+          pageSize
+        );
+        const targetChecksum = await computePaginatedTableChecksum(
+          mariaTarget,
+          table,
+          DatabaseDialect.MariaDB,
+          pageSize
         );
 
-        if (Number(existingRows[0]?.count ?? 0) > 0) {
-          throw new Error(
-            `Table ${table} already has data. Use --force to overwrite or filter with --tables.`
-          );
+        if (
+          sourceCount === targetChecksum.count &&
+          sourceChecksum.checksum === targetChecksum.checksum
+        ) {
+          consoleLog.warn(`Skipping ${table} (already migrated and verified)`);
+          verifications.push({
+            table,
+            sourceCount,
+            targetCount: targetChecksum.count,
+            sourceChecksum: sourceChecksum.checksum,
+            targetChecksum: targetChecksum.checksum,
+            ok: true,
+          });
+          continue;
         }
+      }
+
+      if (options.force) {
+        await mariaTarget.query(`DELETE FROM \`${table}\``);
+      } else if (existingTargetCount > 0) {
+        throw new Error(
+          `Table ${table} already has data. Use --force to overwrite, --skip-existing to resume verified tables, or filter with --tables.`
+        );
       }
 
       const { rows } = await postgresSource.query<Record<string, unknown>>(sql`
@@ -196,10 +291,9 @@ export class MigrationService {
       }
 
       const columns = Object.keys(rows[0]!);
-      const batchSize = options.batchSize ?? 500;
 
-      for (let index = 0; index < rows.length; index += batchSize) {
-        const batch = rows.slice(index, index + batchSize).map(transformRow);
+      for (let index = 0; index < rows.length; index += pageSize) {
+        const batch = rows.slice(index, index + pageSize).map(transformRow);
         const placeholders = batch
           .map(() => `(${columns.map(() => '?').join(', ')})`)
           .join(', ');
@@ -213,28 +307,28 @@ export class MigrationService {
         );
       }
 
-      const { rows: targetCountRows } = await mariaTarget.query<{ count: number }>(
-        `SELECT COUNT(*) as count FROM \`${table}\``
-      );
-      const targetCount = Number(targetCountRows[0]?.count ?? 0);
-      const { rows: targetRows } = await mariaTarget.query<Record<string, unknown>>(
-        `SELECT * FROM \`${table}\``
+      const sourceChecksum = checksumRows(rows);
+      const targetVerification = await computePaginatedTableChecksum(
+        mariaTarget,
+        table,
+        DatabaseDialect.MariaDB,
+        pageSize
       );
 
       const verification: MigrationVerification = {
         table,
         sourceCount,
-        targetCount,
-        sourceChecksum: checksumRows(rows),
-        targetChecksum: checksumRows(targetRows),
-        ok: sourceCount === targetCount && checksumRows(rows) === checksumRows(targetRows),
+        targetCount: targetVerification.count,
+        sourceChecksum,
+        targetChecksum: targetVerification.checksum,
+        ok: sourceCount === targetVerification.count && sourceChecksum === targetVerification.checksum,
       };
 
       verifications.push(verification);
 
       if (!verification.ok) {
         throw new Error(
-          `Verification failed for ${table}: counts ${sourceCount} vs ${targetCount}, checksums ${verification.sourceChecksum} vs ${verification.targetChecksum}`
+          `Verification failed for ${table}: counts ${sourceCount} vs ${targetVerification.count}, checksums ${verification.sourceChecksum} vs ${verification.targetChecksum}`
         );
       }
 

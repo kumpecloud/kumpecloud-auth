@@ -51,17 +51,17 @@ export const createApplicationAccessControlQueries = (pool: CommonQueryMethods) 
         ? await pool.one<ApplicationAccessControl>(sql`
             select
               coalesce((
-                select JSON_ARRAYAGG(${userRelations.fields.userId})
+                select JSON_ARRAYAGG(${userRelations.fields.userId} ORDER BY ${userRelations.fields.userId})
                 from ${userRelations.table}
                 where ${userRelations.fields.applicationId} = ${applicationId}
               ), JSON_ARRAY()) as userIds,
               coalesce((
-                select JSON_ARRAYAGG(${userRoleRelations.fields.roleId})
+                select JSON_ARRAYAGG(${userRoleRelations.fields.roleId} ORDER BY ${userRoleRelations.fields.roleId})
                 from ${userRoleRelations.table}
                 where ${userRoleRelations.fields.applicationId} = ${applicationId}
               ), JSON_ARRAY()) as userRoleIds,
               coalesce((
-                select JSON_ARRAYAGG(${organizationRelations.fields.organizationId})
+                select JSON_ARRAYAGG(${organizationRelations.fields.organizationId} ORDER BY ${organizationRelations.fields.organizationId})
                 from ${organizationRelations.table}
                 where ${organizationRelations.fields.applicationId} = ${applicationId}
               ), JSON_ARRAY()) as organizationIds,
@@ -71,16 +71,19 @@ export const createApplicationAccessControlQueries = (pool: CommonQueryMethods) 
                     'organizationId', organization_id,
                     'organizationRoleIds', organization_role_ids
                   )
+                  ORDER BY organization_id
                 )
                 from (
                   select
                     ${organizationRoleRelations.fields.organizationId} as organization_id,
                     JSON_ARRAYAGG(
                       ${organizationRoleRelations.fields.organizationRoleId}
+                      ORDER BY ${organizationRoleRelations.fields.organizationRoleId}
                     ) as organization_role_ids
                   from ${organizationRoleRelations.table}
                   where ${organizationRoleRelations.fields.applicationId} = ${applicationId}
                   group by ${organizationRoleRelations.fields.organizationId}
+                  order by organization_id
                 ) organization_role_rules
               ), JSON_ARRAY()) as organizationRoleRules
           `)

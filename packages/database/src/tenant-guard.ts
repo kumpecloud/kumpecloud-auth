@@ -45,11 +45,52 @@ export type TenantContext = {
   isAdmin: boolean;
 };
 
-const tenantIdPattern = /\btenant_id\b\s*=\s*['"]?([a-zA-Z0-9_-]+)/i;
+const tenantIdPattern = /\btenant_id\b/i;
+const tenantIdLiteralPattern = (tenantId: string) =>
+  new RegExp(`\\btenant_id\\s*=\\s*['"]?${tenantId.replaceAll(/[$()*+.?[\\\]^{|}]/g, '\\$&')}['"]?`, 'i');
+const tenantIdParameterPattern = /\btenant_id\s*=\s*(\?|\$\d+)/i;
 
 export type TenantGuardViolation = {
   table: string;
   reason: string;
+};
+
+const findReferencedTenantTables = (
+  sqlText: string,
+  tableNames: ReadonlySet<string>
+): string[] => {
+  const normalized = sqlText.toLowerCase();
+  const referenced: string[] = [];
+
+  for (const table of tableNames) {
+    const tablePattern = new RegExp(`\\b${table}\\b`, 'i');
+
+    if (tablePattern.test(normalized)) {
+      referenced.push(table);
+    }
+  }
+
+  return referenced;
+};
+
+const hasTenantIsolationPredicate = (sqlText: string, tenantId: string) => {
+  if (!tenantIdPattern.test(sqlText)) {
+    return false;
+  }
+
+  if (tenantIdLiteralPattern(tenantId).test(sqlText)) {
+    return true;
+  }
+
+  if (tenantIdParameterPattern.test(sqlText)) {
+    return true;
+  }
+
+  if (/\b@logto_tenant_id\b/i.test(sqlText)) {
+    return true;
+  }
+
+  return false;
 };
 
 export const assertTenantScopedSql = (
@@ -61,21 +102,33 @@ export const assertTenantScopedSql = (
     return;
   }
 
-  const normalized = sqlText.toLowerCase();
+  const referencedTables = findReferencedTenantTables(sqlText, tableNames);
 
-  for (const table of tableNames) {
-    if (!normalized.includes(table)) {
-      continue;
-    }
+  if (referencedTables.length === 0) {
+    return;
+  }
 
-    const match = tenantIdPattern.exec(sqlText);
+  if (!hasTenantIsolationPredicate(sqlText, context.tenantId)) {
+    const joinHint =
+      referencedTables.length > 1
+        ? ' Multi-table queries must include a tenant_id filter.'
+        : '';
 
-    if (!match || match[1] !== context.tenantId) {
-      return {
-        table,
-        reason: `Query on tenant-scoped table "${table}" must filter tenant_id = '${context.tenantId}'`,
-      };
-    }
+    return {
+      table: referencedTables[0]!,
+      reason: `Query on tenant-scoped table "${referencedTables[0]!}" must filter tenant_id for tenant '${context.tenantId}'.${joinHint}`,
+    };
+  }
+
+  if (
+    !tenantIdLiteralPattern(context.tenantId).test(sqlText) &&
+    !tenantIdParameterPattern.test(sqlText) &&
+    !/\b@logto_tenant_id\b/i.test(sqlText)
+  ) {
+    return {
+      table: referencedTables[0]!,
+      reason: `Query on tenant-scoped table "${referencedTables[0]!}" must bind tenant_id to '${context.tenantId}'`,
+    };
   }
 
   return;

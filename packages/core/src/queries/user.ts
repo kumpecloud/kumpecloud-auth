@@ -3,11 +3,13 @@ import type { User, CreateUser } from '@logto/schemas';
 import { MfaFactor, Users } from '@logto/schemas';
 import {
   buildDateGroupExpression,
+  buildIdentityUserIdEquals,
   buildJsonContains,
   buildJsonRemoveKey,
   buildTimestampFromMillis,
   DatabaseDialect,
   getDatabaseDialectFromEnv,
+  normalizeJsonStringArray,
 } from '@logto/database';
 import { PhoneNumberParser } from '@logto/shared';
 import { cond, conditionalArray, type Nullable, pick } from '@silverhand/essentials';
@@ -178,7 +180,7 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
       sql`
         select ${sql.join(Object.values(fields), sql`,`)}
         from ${table}
-        where ${fields.identities}::json#>>'{${sql.identifier([target])},userId}' = ${userId}
+        where ${buildIdentityUserIdEquals(fields.identities, target, userId, dialect)}
       `
     );
 
@@ -199,28 +201,36 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
    * case-insensitive policy). Each row is one `lower(username)` value shared by more than one user,
    * with the colliding user ids. Ordered oldest-group-first and capped by `limit` for sampling.
    */
-  const findUsernameCaseConflicts = async (limit: number) =>
-    dialect === DatabaseDialect.MariaDB
-      ? pool.any<{ usernameLower: string; userIds: string[] }>(sql`
-          select lower(${fields.username}) as usernameLower,
-                 JSON_ARRAYAGG(${fields.id}) as userIds
-          from ${table}
-          where ${fields.username} is not null
-          group by lower(${fields.username})
-          having count(*) > 1
-          order by min(${fields.createdAt})
-          limit ${limit}
-        `)
-      : pool.any<{ usernameLower: string; userIds: string[] }>(sql`
-          select lower(${fields.username}) as "usernameLower",
-                 array_agg(${fields.id}) as "userIds"
-          from ${table}
-          where ${fields.username} is not null
-          group by lower(${fields.username})
-          having count(*) > 1
-          order by min(${fields.createdAt})
-          limit ${limit}
-        `);
+  const findUsernameCaseConflicts = async (limit: number) => {
+    if (dialect === DatabaseDialect.MariaDB) {
+      const rows = await pool.any<{ usernameLower: string; userIds: unknown }>(sql`
+        select lower(${fields.username}) as usernameLower,
+               JSON_ARRAYAGG(${fields.id} ORDER BY ${fields.id}) as userIds
+        from ${table}
+        where ${fields.username} is not null
+        group by lower(${fields.username})
+        having count(*) > 1
+        order by min(${fields.createdAt})
+        limit ${limit}
+      `);
+
+      return rows.map((row) => ({
+        usernameLower: row.usernameLower,
+        userIds: normalizeJsonStringArray(row.userIds),
+      }));
+    }
+
+    return pool.any<{ usernameLower: string; userIds: string[] }>(sql`
+      select lower(${fields.username}) as "usernameLower",
+             array_agg(${fields.id}) as "userIds"
+      from ${table}
+      where ${fields.username} is not null
+      group by lower(${fields.username})
+      having count(*) > 1
+      order by min(${fields.createdAt})
+      limit ${limit}
+    `);
+  };
 
   /** Total number of case-insensitive username collision groups (see {@link findUsernameCaseConflicts}). */
   const countUsernameCaseConflicts = async () =>
@@ -310,7 +320,7 @@ export const createUserQueries = (pool: CommonQueryMethods) => {
       sql`
         select ${fields.id}
         from ${table}
-        where ${fields.identities}::json#>>'{${sql.identifier([target])},userId}' = ${userId}
+        where ${buildIdentityUserIdEquals(fields.identities, target, userId, dialect)}
         ${conditionalSql(excludeUserId, (id) => sql`and ${fields.id}<>${id}`)}
       `
     );

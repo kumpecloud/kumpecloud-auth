@@ -11,6 +11,9 @@ const migrate: CommandModule<
     dryRun?: boolean;
     batchSize?: number;
     tables?: string;
+    skipTables?: string;
+    resumeFrom?: string;
+    skipExisting?: boolean;
     force?: boolean;
   }
 > = {
@@ -34,7 +37,7 @@ const migrate: CommandModule<
         default: false,
       })
       .option('batch-size', {
-        describe: 'Rows per insert batch',
+        describe: 'Rows per insert batch and verification page size',
         type: 'number',
         default: 500,
       })
@@ -42,18 +45,50 @@ const migrate: CommandModule<
         describe: 'Comma-separated table filter',
         type: 'string',
       })
+      .option('skip-tables', {
+        describe: 'Comma-separated tables to skip',
+        type: 'string',
+      })
+      .option('resume-from', {
+        describe: 'Resume migration starting at this table',
+        type: 'string',
+      })
+      .option('skip-existing', {
+        describe: 'Skip tables that already match source row count and checksum',
+        type: 'boolean',
+        default: false,
+      })
       .option('force', {
-        describe: 'Allow re-run (future: truncate targets)',
+        describe: 'Truncate target tables before copying',
         type: 'boolean',
         default: false,
       }),
-  handler: async ({ from, to, dryRun, batchSize, tables, force }) => {
+  handler: async ({
+    from,
+    to,
+    dryRun,
+    batchSize,
+    tables,
+    skipTables,
+    resumeFrom,
+    skipExisting,
+    force,
+  }) => {
+    const parseTableList = (value?: string) =>
+      value
+        ?.split(',')
+        .map((table) => table.trim())
+        .filter(Boolean);
+
     await migratePgToMariaDb({
       fromUrl: from,
       toUrl: to,
       dryRun,
       batchSize,
-      tables: tables?.split(',').map((table) => table.trim()).filter(Boolean),
+      tables: parseTableList(tables),
+      skipTables: parseTableList(skipTables),
+      resumeFrom,
+      skipExisting,
       force,
     });
   },

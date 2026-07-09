@@ -48,9 +48,9 @@ export const mariaQueryDialect: QueryDialect = {
 
   buildLikeOperator: () => sql`LIKE`,
 
-  buildSimilarToOperator: () => sql`REGEXP`,
+  buildSimilarToOperator: () => sql`REGEXP BINARY`,
 
-  buildRegexOperator: () => sql`REGEXP`,
+  buildRegexOperator: (caseSensitive: boolean) => (caseSensitive ? sql`REGEXP BINARY` : sql`REGEXP`),
 
   buildExactOperator: () => sql`=`,
 

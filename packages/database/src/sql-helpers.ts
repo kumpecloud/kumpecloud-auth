@@ -2,6 +2,7 @@ import type { IdentifierSqlToken, SqlSqlToken, ValueExpression } from '@silverha
 import { sql } from '@silverhand/slonik';
 
 import { DatabaseDialect, parseDatabaseUrl } from './dialect.js';
+import { oidcPayloadJsonPaths, userIdentitiesJsonPaths } from './json-paths.js';
 
 export const getDatabaseDialectFromEnv = (): DatabaseDialect =>
   parseDatabaseUrl(process.env.DB_URL ?? '').dialect;
@@ -52,7 +53,7 @@ export const buildJsonRemoveKey = (
   dialect: DatabaseDialect
 ): SqlSqlToken => {
   if (dialect === DatabaseDialect.MariaDB) {
-    return sql`JSON_REMOVE(${column}, ${`$.${key}`})`;
+    return sql`JSON_REMOVE(${column}, ${userIdentitiesJsonPaths.identityKey(key)})`;
   }
 
   return sql`${column}::jsonb-${key}`;
@@ -64,7 +65,7 @@ export const buildGrantIdInAuthorizationsExists = (
   dialect: DatabaseDialect
 ): SqlSqlToken => {
   if (dialect === DatabaseDialect.MariaDB) {
-    return sql`JSON_SEARCH(JSON_EXTRACT(${payloadColumn}, '$.authorizations'), 'one', ${grantId}, NULL, '$**.grantId') IS NOT NULL`;
+    return sql`JSON_SEARCH(JSON_EXTRACT(${payloadColumn}, ${oidcPayloadJsonPaths.authorizations}), 'one', ${grantId}, NULL, ${oidcPayloadJsonPaths.grantIdSearch}) IS NOT NULL`;
   }
 
   return sql`exists (
@@ -72,6 +73,19 @@ export const buildGrantIdInAuthorizationsExists = (
     from jsonb_each(${payloadColumn} -> 'authorizations') as authorization_entry
     where authorization_entry.value ->> 'grantId' = ${grantId}
   )`;
+};
+
+export const buildIdentityUserIdEquals = (
+  identitiesColumn: IdentifierSqlToken,
+  identityKey: string,
+  userId: string,
+  dialect: DatabaseDialect
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`JSON_UNQUOTE(JSON_EXTRACT(${identitiesColumn}, ${userIdentitiesJsonPaths.userId(identityKey)})) = ${userId}`;
+  }
+
+  return sql`${identitiesColumn}::json#>>'{${sql.identifier([identityKey])},userId}' = ${userId}`;
 };
 
 export const buildOnConflictDoNothing = (dialect: DatabaseDialect): SqlSqlToken => {

@@ -45,6 +45,7 @@ export {
   buildEmptyJsonArray,
   buildEmptyStringArray,
   buildGrantIdInAuthorizationsExists,
+  buildIdentityUserIdEquals,
   buildInArrayCondition,
   buildJsonCoalesceMerge,
   buildJsonContains,
@@ -53,6 +54,10 @@ export {
   buildTimestampFromMillis,
   getDatabaseDialectFromEnv,
 } from './sql-helpers.js';
+
+export { normalizeJsonStringArray } from './json-normalize.js';
+export { getMariaReturningLookupKeys } from './returning-lookup.js';
+export { oidcPayloadJsonPaths, userIdentitiesJsonPaths } from './json-paths.js';
 
 export {
   assertTenantScopedSql,

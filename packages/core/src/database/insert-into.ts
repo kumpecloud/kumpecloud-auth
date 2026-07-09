@@ -1,5 +1,5 @@
 import type { GeneratedSchema, SchemaLike } from '@logto/schemas';
-import { asSqlFragment, DatabaseDialect, getQueryDialectFromUrl } from '@logto/database';
+import { asSqlFragment, DatabaseDialect, getMariaReturningLookupKeys, getQueryDialectFromUrl } from '@logto/database';
 import { has } from '@silverhand/essentials';
 import type { CommonQueryMethods, IdentifierSqlToken } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
@@ -94,9 +94,21 @@ export const buildInsertIntoWithPool =
         ${asSqlFragment(queryDialect.buildReturningClause(returning))}
       `);
 
-      if (returning && queryDialect.dialect === DatabaseDialect.MariaDB && !entry && 'id' in data) {
+      if (returning && queryDialect.dialect === DatabaseDialect.MariaDB && !entry) {
+        const lookupKeys = getMariaReturningLookupKeys(insertingKeys, data);
+
+        assertThat(
+          lookupKeys.length > 0,
+          new InsertionError<Key, CreateSchema, Schema>(schema, data)
+        );
+
+        const whereConditions = lookupKeys.map((key) =>
+          sql`${fields[key]}=${convertToPrimitiveOrSql(key, data[key] ?? null)}`
+        );
+
         const { rows: [selected] } = await pool.query<Schema>(sql`
-          select * from ${table} where ${fields.id} = ${String(data.id)}
+          select * from ${table}
+          where ${sql.join(whereConditions, sql` and `)}
         `);
 
         assertThat(selected, new InsertionError<Key, CreateSchema, Schema>(schema, data));
