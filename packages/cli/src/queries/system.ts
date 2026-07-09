@@ -16,7 +16,7 @@ const getDialectFromEnv = () =>
     ? getDatabaseDialectFromUrl(process.env.DB_URL)
     : DatabaseDialect.Postgres;
 
-const doesTableExist = async (pool: CommonQueryMethods, tableName: string) => {
+export const doesTableExist = async (pool: CommonQueryMethods, tableName: string) => {
   const dialect = getDialectFromEnv();
 
   if (dialect === DatabaseDialect.MariaDB) {

@@ -1,21 +1,16 @@
 import type { LogtoConfig, LogtoConfigKey, logtoConfigGuards } from '@logto/schemas';
 import { LogtoConfigs } from '@logto/schemas';
-import type { Nullable } from '@silverhand/essentials';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 import type { z } from 'zod';
 
 import { convertToIdentifiers } from '../sql.js';
+import { doesTableExist } from './system.js';
 
 const { table, fields } = convertToIdentifiers(LogtoConfigs);
 
-export const doesConfigsTableExist = async (pool: CommonQueryMethods) => {
-  const { rows } = await pool.query<{ regclass: Nullable<string> }>(
-    sql`select to_regclass(${LogtoConfigs.table}) as regclass`
-  );
-
-  return Boolean(rows[0]?.regclass);
-};
+export const doesConfigsTableExist = async (pool: CommonQueryMethods) =>
+  doesTableExist(pool, LogtoConfigs.table);
 
 export const getRowsByKeys = async (
   pool: CommonQueryMethods,
