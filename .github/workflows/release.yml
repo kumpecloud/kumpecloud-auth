@@ -8,9 +8,18 @@ on:
     tags:
       - '*'
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release job to run
+        required: true
+        type: choice
+        default: dockerize-edge
+        options:
+          - dockerize-edge
+          - dockerize
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event.inputs.release_type || 'auto' }}
 
 permissions:
   contents: read
@@ -18,7 +27,11 @@ permissions:
 
 jobs:
   dockerize:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: >-
+      ${{
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.release_type == 'dockerize')
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -72,7 +85,12 @@ jobs:
           cache-to: type=gha,mode=max
 
   dockerize-edge:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: >-
+      ${{
+        (github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.release_type == 'dockerize-edge')
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
