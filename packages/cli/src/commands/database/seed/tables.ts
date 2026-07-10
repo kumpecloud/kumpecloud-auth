@@ -91,6 +91,25 @@ const lifecycleNames: readonly string[] = Object.freeze([
   'after_each',
 ] satisfies Lifecycle[]);
 
+const shouldSkipQueryFile = (file: string) => {
+  if (!file.endsWith('.sql')) {
+    return true;
+  }
+
+  if (!file.startsWith('_')) {
+    return false;
+  }
+
+  const base = file.slice(1, -4);
+
+  if (lifecycleNames.includes(base)) {
+    return true;
+  }
+
+  // MariaDB conversion artifacts; canonical _*.sql lifecycle files are used instead.
+  return base.endsWith('_mariadb');
+};
+
 export const getTablesDirectory = (dialect: DatabaseDialect = getDatabaseDialectFromUrl(process.env.DB_URL ?? '')) =>
   getPathInModule('@logto/schemas', dialect === DatabaseDialect.MariaDB ? 'tables-mariadb' : 'tables');
 
@@ -130,8 +149,10 @@ export const createTables = async (
   };
 
   const allQueries: Array<[string, string]> = [
-    [Tenants.tableName, Tenants.raw],
-    ...queries.filter(([file]) => !lifecycleNames.includes(file.slice(1, -4))),
+    ...(dialect === DatabaseDialect.Postgres
+      ? ([[Tenants.tableName, Tenants.raw]] as Array<[string, string]>)
+      : []),
+    ...queries.filter(([file]) => !shouldSkipQueryFile(file)),
   ];
   const sorted = allQueries.slice().sort(compareQuery);
   const database = await getDatabaseName(connection, true);
