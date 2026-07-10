@@ -45,6 +45,6 @@ create table sign_in_experiences (
       "numbers": true,
       "underscore": true
     }
-  }'::JSON),
+  }'),
   primary key (tenant_id, id)
 );

@@ -48,7 +48,7 @@ const parseTableColumns = (sql: string): Map<string, Set<string>> => {
         continue;
       }
 
-      const columnMatch = /^([a-z_][a-z0-9_]*)\s+\S+/i.exec(trimmed);
+      const columnMatch = /^`?([a-z_][a-z0-9_]*)`?\s+\S+/i.exec(trimmed);
 
       if (columnMatch?.[1]) {
         columns.add(columnMatch[1].toLowerCase());

@@ -12,9 +12,7 @@ create table organization_role_user_relations (
   /** User's roles in an organization should be synchronized with the user's membership in the organization. */
   foreign key (tenant_id, organization_id, user_id)
     references organization_user_relations (tenant_id, organization_id, user_id)
-    on update cascade on delete cascade,
-  constraint organization_role_user_relations__role_type
-    check ((select type from organization_roles where id = organization_role_id) = 'User')
+    on update cascade on delete cascade
 );
 
 create index organization_role_user_relations__tenant_id_org_id_user_id

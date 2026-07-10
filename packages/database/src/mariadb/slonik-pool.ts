@@ -22,24 +22,98 @@ const isQueryToken = (value: unknown): value is SlonikQueryToken =>
 
 const convertPostgresPlaceholders = (queryText: string) => queryText.replace(/\$(\d+)/g, '?');
 
+/** Convert Postgres "identifiers" to MariaDB `identifiers`, ignoring string literals. */
+export const rewriteDoubleQuotedIdentifiers = (queryText: string): string => {
+  let result = '';
+  let inSingleQuote = false;
+
+  for (let index = 0; index < queryText.length; index += 1) {
+    const char = queryText[index]!;
+    const next = queryText[index + 1];
+
+    if (inSingleQuote) {
+      result += char;
+
+      if (char === "'" && next === "'") {
+        result += next;
+        index += 1;
+        continue;
+      }
+
+      if (char === "'") {
+        inSingleQuote = false;
+      }
+
+      continue;
+    }
+
+    if (char === "'") {
+      inSingleQuote = true;
+      result += char;
+      continue;
+    }
+
+    if (char === '"') {
+      let end = index + 1;
+      let identifier = '';
+
+      while (end < queryText.length) {
+        const current = queryText[end]!;
+        const following = queryText[end + 1];
+
+        if (current === '"' && following === '"') {
+          identifier += '"';
+          end += 2;
+          continue;
+        }
+
+        if (current === '"') {
+          break;
+        }
+
+        identifier += current;
+        end += 1;
+      }
+
+      result += `\`${identifier.replaceAll('`', '``')}\``;
+      index = end;
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+};
+
 /** Best-effort SQL rewrites for Slonik queries not yet ported to QueryDialect. */
 export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
-  queryText
-    .replaceAll("'{}'::jsonb", 'JSON_OBJECT()')
-    .replaceAll("'[]'::jsonb", 'JSON_ARRAY()')
-    .replaceAll('array[]::varchar[]', 'JSON_ARRAY()')
-    .replaceAll('::jsonb', '')
-    .replaceAll('::varchar[]', '')
-    .replaceAll('::int', '')
-    .replace(/\bon conflict do nothing\b/gi, 'ON DUPLICATE KEY UPDATE tenant_id = tenant_id')
-    .replace(
-      /\bcoalesce\(([^,]+),\s*'\{\}'::jsonb\)\s*\|\|/gi,
-      'JSON_MERGE_PATCH(COALESCE($1, JSON_OBJECT()),'
-    )
-    .replace(
-      /\bto_timestamp\(([^)]+)\s*\/\s*1000\)/gi,
-      'FROM_UNIXTIME($1 / 1000)'
-    );
+  rewriteDoubleQuotedIdentifiers(
+    queryText
+      .replaceAll("'{}'::jsonb", 'JSON_OBJECT()')
+      .replaceAll("'[]'::jsonb", 'JSON_ARRAY()')
+      .replaceAll('array[]::varchar[]', 'JSON_ARRAY()')
+      .replaceAll('::jsonb', '')
+      .replaceAll('::varchar[]', '')
+      .replaceAll('::int', '')
+      .replace(/\bon conflict do nothing\b/gi, 'ON DUPLICATE KEY UPDATE tenant_id = tenant_id')
+      .replace(
+        /\bon conflict\s*\([^)]*\)\s*do update set\s+([\s\S]*?)(?=$|;)/gi,
+        (_match, assignments: string) => {
+          const rewritten = String(assignments)
+            .replace(/\bexcluded\.(`?[a-zA-Z_][\w]*`?)/gi, 'VALUES($1)')
+            .trim()
+            .replace(/;?\s*$/, '');
+
+          return `ON DUPLICATE KEY UPDATE ${rewritten}`;
+        }
+      )
+      .replace(
+        /\bcoalesce\(([^,]+),\s*'\{\}'::jsonb\)\s*\|\|/gi,
+        'JSON_MERGE_PATCH(COALESCE($1, JSON_OBJECT()),'
+      )
+      .replace(/\bto_timestamp\(([^)]+)\s*\/\s*1000\)/gi, 'FROM_UNIXTIME($1 / 1000)')
+  );
 
 const serializeValue = (value: unknown) => {
   if (

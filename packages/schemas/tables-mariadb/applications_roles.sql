@@ -10,9 +10,7 @@ create table applications_roles (
     references roles (id) on update cascade on delete cascade,
   primary key (id),
   constraint applications_roles__application_id_role_id
-    unique (tenant_id, application_id, role_id),
-  constraint applications_roles__role_type
-    check ((select type from roles where id = role_id) = 'MachineToMachine')
+    unique (tenant_id, application_id, role_id)
 );
 
 create index applications_roles__id

@@ -11,7 +11,5 @@ create table saml_application_configs (
   acs_url JSON /* @use SamlAcsUrl */,
   encryption JSON /* @use SamlEncryption */,
   name_id_format varchar(128) /* @use NameIdFormat */ not null,
-  primary key (tenant_id, application_id),
-  constraint saml_application_configs__application_type
-    check ((select type from applications where id = application_id) = 'SAML')
+  primary key (tenant_id, application_id)
 );

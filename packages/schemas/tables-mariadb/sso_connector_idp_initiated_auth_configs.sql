@@ -17,8 +17,5 @@ create table sso_connector_idp_initiated_auth_configs (
   /** The client side callback URI for handling IdP-initiated auth request. */
   client_idp_initiated_auth_callback_uri text,
   created_at DATETIME(3) not null DEFAULT CURRENT_TIMESTAMP(3),
-  primary key (tenant_id, connector_id),
-  /** Insure the application type is Traditional or SPA. */
-  constraint application_type
-    check ((select type from applications where id = default_application_id) in ('Traditional', 'SPA', 'SAML'))
+  primary key (tenant_id, connector_id)
 );

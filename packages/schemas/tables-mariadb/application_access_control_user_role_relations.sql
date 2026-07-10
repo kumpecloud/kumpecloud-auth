@@ -8,7 +8,5 @@ create table application_access_control_user_role_relations (
     references applications (id) on update cascade on delete cascade,
   role_id varchar(21) not null
     references roles (id) on update cascade on delete cascade,
-  primary key (tenant_id, application_id, role_id),
-  constraint application_access_control_user_role_relations__role_type
-    check ((select type from roles where id = role_id) = 'User')
+  primary key (tenant_id, application_id, role_id)
 );

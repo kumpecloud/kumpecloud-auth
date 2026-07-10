@@ -8,10 +8,8 @@ create table application_secrets (
     references applications (id) on update cascade on delete cascade,
   /** The name of the secret. Should be unique within the application. */
   name varchar(256) not null,
-  value varchar(64) not null,
+  `value` varchar(64) not null,
   created_at DATETIME(3) not null default CURRENT_TIMESTAMP(3),
   expires_at DATETIME(3),
-  primary key (tenant_id, application_id, name),
-  constraint application_type
-    check ((select type from applications where id = application_id) in ('MachineToMachine', 'Traditional', 'Protected'))
+  primary key (tenant_id, application_id, name)
 );

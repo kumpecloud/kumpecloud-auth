@@ -21,5 +21,4 @@ create table user_sso_identities (
     unique (tenant_id, issuer, identity_id)
 );
 
-
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON user_sso_identities FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3);
+CREATE TRIGGER user_sso_identities_set_updated_at BEFORE UPDATE ON user_sso_identities FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3);

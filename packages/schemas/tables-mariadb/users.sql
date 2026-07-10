@@ -25,6 +25,7 @@ create table users (
   password_updated_at DATETIME(3),
   created_at DATETIME(3) not null DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) not null DEFAULT CURRENT_TIMESTAMP(3),
+  username_lower varchar(128) as (lower(username)) virtual,
   primary key (id),
   constraint users__username
     unique (tenant_id, username),
@@ -41,8 +42,8 @@ create unique index users__id
 create index users__name
   on users (tenant_id, name);
 
+CREATE TRIGGER users_set_updated_at BEFORE UPDATE ON users FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3);
+
 /* Supports case-insensitive username lookups and case-flip conflict detection. */
 create index users__tenant_lower_username
-  on users (tenant_id, lower(username));
-
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON users FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3);
+  on users (tenant_id, username_lower);

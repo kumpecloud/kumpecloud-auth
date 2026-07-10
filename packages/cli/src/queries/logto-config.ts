@@ -1,3 +1,4 @@
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
 import type { LogtoConfig, LogtoConfigKey, logtoConfigGuards } from '@logto/schemas';
 import { LogtoConfigs } from '@logto/schemas';
 import type { CommonQueryMethods } from '@silverhand/slonik';
@@ -8,6 +9,11 @@ import { convertToIdentifiers } from '../sql.js';
 import { doesTableExist } from './system.js';
 
 const { table, fields } = convertToIdentifiers(LogtoConfigs);
+
+const getDialectFromEnv = () =>
+  process.env.DB_URL
+    ? getDatabaseDialectFromUrl(process.env.DB_URL)
+    : DatabaseDialect.Postgres;
 
 export const doesConfigsTableExist = async (pool: CommonQueryMethods) =>
   doesTableExist(pool, LogtoConfigs.table);
@@ -28,8 +34,20 @@ export const updateValueByKey = async <T extends LogtoConfigKey>(
   tenantId: string,
   key: T,
   value: z.infer<(typeof logtoConfigGuards)[T]>
-) =>
-  pool.query(
+) => {
+  const dialect = getDialectFromEnv();
+
+  if (dialect === DatabaseDialect.MariaDB) {
+    const serialized = JSON.stringify(value);
+
+    return pool.query(sql`
+      insert into ${table} (${fields.tenantId}, ${fields.key}, ${fields.value})
+        values (${tenantId}, ${key}, ${serialized})
+        on duplicate key update ${fields.value} = ${serialized}
+    `);
+  }
+
+  return pool.query(
     sql`
       insert into ${table} (${fields.tenantId}, ${fields.key}, ${fields.value}) 
         values (${tenantId}, ${key}, ${sql.jsonb(value)})
@@ -37,3 +55,4 @@ export const updateValueByKey = async <T extends LogtoConfigKey>(
           do update set ${fields.value}=excluded.${fields.value}
     `
   );
+};

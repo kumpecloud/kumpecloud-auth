@@ -17,7 +17,5 @@ create table saml_application_sessions (
   raw_auth_request text not null,
   created_at DATETIME(3) not null DEFAULT CURRENT_TIMESTAMP(3),
   expires_at DATETIME(3) not null,
-  primary key (tenant_id, id),
-  constraint saml_application_sessions__application_type 
-    check ((select type from applications where id = application_id) = 'SAML')
+  primary key (tenant_id, id)
 );

@@ -13,4 +13,4 @@ create table application_user_consent_organizations (
   foreign key (tenant_id, organization_id, user_id)
     references organization_user_relations (tenant_id, organization_id, user_id)
     on update cascade on delete cascade
-)
+);

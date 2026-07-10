@@ -49,6 +49,7 @@ import { consoleLog, getPathInModule } from '../../../utils.js';
 import { appendAdminConsoleRedirectUris, seedTenantCloudServiceApplication } from './cloud.js';
 import { seedOidcConfigs } from './oidc-config.js';
 import { seedPreConfiguredManagementApiAccessRole } from './roles.js';
+import { splitSqlStatements } from './split-sql-statements.js';
 import { seedTenantOrganizations } from './tenant-organizations.js';
 import {
   assignScopesToRole,
@@ -128,6 +129,18 @@ export const createTables = async (
     ])
   );
 
+  const runSqlScript = async (query: string) => {
+    if (dialect === DatabaseDialect.MariaDB) {
+      for (const statement of splitSqlStatements(query)) {
+        await connection.query(sql`${sql.raw(statement)}`);
+      }
+
+      return;
+    }
+
+    await connection.query(sql`${sql.raw(query)}`);
+  };
+
   const runLifecycleQuery = async (
     lifecycle: Lifecycle,
     parameters: { name?: string; database?: string; password?: string } = {}
@@ -135,15 +148,13 @@ export const createTables = async (
     const query = queries.find(([file]) => file.slice(1, -4) === lifecycle)?.[1];
 
     if (query) {
-      await connection.query(
-        sql`${sql.raw(
-          /* eslint-disable no-template-curly-in-string */
-          query
-            .replaceAll('${name}', parameters.name ?? '')
-            .replaceAll('${database}', parameters.database ?? '')
-            .replaceAll('${password}', parameters.password ?? '')
-          /* eslint-enable no-template-curly-in-string */
-        )}`
+      await runSqlScript(
+        /* eslint-disable no-template-curly-in-string */
+        query
+          .replaceAll('${name}', parameters.name ?? '')
+          .replaceAll('${database}', parameters.database ?? '')
+          .replaceAll('${password}', parameters.password ?? '')
+        /* eslint-enable no-template-curly-in-string */
       );
     }
   };
@@ -162,7 +173,7 @@ export const createTables = async (
 
   /* eslint-disable no-await-in-loop */
   for (const [file, query] of sorted) {
-    await connection.query(sql`${sql.raw(query)}`);
+    await runSqlScript(query);
 
     if (!query.includes('/* no_after_each */')) {
       await runLifecycleQuery('after_each', { name: file.split('.')[0], database });

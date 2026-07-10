@@ -8,7 +8,5 @@ create table organization_application_relations (
     references organizations (id) on update cascade on delete cascade,
   application_id varchar(21) not null
     references applications (id) on update cascade on delete cascade,
-  primary key (tenant_id, organization_id, application_id),
-  constraint application_type
-    check ((select type from applications where id = application_id) = 'MachineToMachine')
+  primary key (tenant_id, organization_id, application_id)
 );

@@ -13,4 +13,4 @@ create table oidc_session_extensions (
   primary key (tenant_id, session_uid)
 );
 
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON oidc_session_extensions FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3);
+CREATE TRIGGER oidc_session_extensions_set_updated_at BEFORE UPDATE ON oidc_session_extensions FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3);

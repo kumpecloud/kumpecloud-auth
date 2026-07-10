@@ -1,6 +1,7 @@
-/* MariaDB: triggers only — no RLS. Tenant isolation via TenantGuard + @logto_tenant_id session. */
+/* MariaDB: triggers only — no RLS. Tenant isolation via TenantGuard + @logto_tenant_id session.
+   Trigger names use `_sti` (set tenant id) to stay within MariaDB's 64-char identifier limit. */
 
-CREATE TRIGGER ${name}_set_tenant_id BEFORE INSERT ON ${name}
+CREATE TRIGGER ${name}_sti BEFORE INSERT ON ${name}
 FOR EACH ROW
 BEGIN
   IF NEW.tenant_id IS NULL AND @logto_tenant_id IS NOT NULL THEN

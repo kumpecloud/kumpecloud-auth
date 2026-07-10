@@ -7,10 +7,10 @@ create table personal_access_tokens (
     references users (id) on update cascade on delete cascade,
   /** The name of the secret. Should be unique within the user. */
   name varchar(256) not null,
-  value varchar(64) not null,
+  `value` varchar(64) not null,
   created_at DATETIME(3) not null default CURRENT_TIMESTAMP(3),
   expires_at DATETIME(3),
   primary key (tenant_id, user_id, name)
 );
 
-create index personal_access_token__value on personal_access_tokens (tenant_id, value);
+create index personal_access_token__value on personal_access_tokens (tenant_id, `value`);

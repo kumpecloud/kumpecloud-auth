@@ -27,5 +27,5 @@ create index sentinel_activities__id
 create index sentinel_activities__target_type_target_hash
   on sentinel_activities (tenant_id, target_type, target_hash);
 
-create index sentinel_activities__target_type_target_hash_action_action_result_decision
+create index sentinel_activities__target_type_target_hash_action_act_ba09a12b
   on sentinel_activities (tenant_id, target_type, target_hash, action, action_result, decision);

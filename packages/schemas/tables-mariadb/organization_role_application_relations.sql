@@ -12,7 +12,5 @@ create table organization_role_application_relations (
   /** Application's roles in an organization should be synchronized with the application's membership in the organization. */
   foreign key (tenant_id, organization_id, application_id)
     references organization_application_relations (tenant_id, organization_id, application_id)
-    on update cascade on delete cascade,
-  constraint organization_role_application_relations__role_type
-    check ((select type from organization_roles where id = organization_role_id) = 'MachineToMachine')
+    on update cascade on delete cascade
 );

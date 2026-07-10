@@ -10,9 +10,7 @@ create table users_roles (
     references roles (id) on update cascade on delete cascade,
   primary key (id),
   constraint users_roles__user_id_role_id
-    unique (tenant_id, user_id, role_id),
-  constraint users_roles__role_type
-    check ((select type from roles where id = role_id) = 'User')
+    unique (tenant_id, user_id, role_id)
 );
 
 create index users_roles__id

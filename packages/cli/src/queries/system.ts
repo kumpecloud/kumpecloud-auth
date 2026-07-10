@@ -130,8 +130,20 @@ export const updateValueByKey = async <T extends SystemKey>(
   pool: CommonQueryMethods,
   key: T,
   value: z.infer<(typeof systemGuards)[T]>
-) =>
-  pool.query(
+) => {
+  const dialect = getDialectFromEnv();
+
+  if (dialect === DatabaseDialect.MariaDB) {
+    const serialized = JSON.stringify(value);
+
+    return pool.query(sql`
+      insert into ${table} (${fields.key}, ${fields.value})
+        values (${key}, ${serialized})
+        on duplicate key update ${fields.value} = ${serialized}
+    `);
+  }
+
+  return pool.query(
     sql`
       insert into ${table} (${fields.key}, ${fields.value}) 
         values (${key}, ${sql.jsonb(value)})
@@ -139,3 +151,4 @@ export const updateValueByKey = async <T extends SystemKey>(
           do update set ${fields.value}=excluded.${fields.value}
     `
   );
+};

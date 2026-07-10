@@ -64,9 +64,10 @@ const convertContent = (fileName, content) => {
   }
 
   if (fileName === '_after_each.sql') {
-    return `/* MariaDB: triggers only — no RLS. Tenant isolation via TenantGuard + @logto_tenant_id session. */
+    return `/* MariaDB: triggers only — no RLS. Tenant isolation via TenantGuard + @logto_tenant_id session.
+   Trigger names use \`_sti\` (set tenant id) to stay within MariaDB's 64-char identifier limit. */
 
-CREATE TRIGGER \${name}_set_tenant_id BEFORE INSERT ON \${name}
+CREATE TRIGGER \${name}_sti BEFORE INSERT ON \${name}
 FOR EACH ROW
 BEGIN
   IF NEW.tenant_id IS NULL AND @logto_tenant_id IS NOT NULL THEN
@@ -95,7 +96,9 @@ END;
   result = convertEnumColumns(result);
   result = result.replace(/\bjsonb\b/gi, 'JSON');
   result = result.replace(/\btimestamptz\b/gi, 'DATETIME(3)');
+  result = result.replace(/\bbytea\b/gi, 'longblob');
   result = result.replace(/::jsonb/gi, '');
+  result = result.replace(/::JSON\b/g, '');
   result = result.replace(/'{}'::json/gi, "'{}'");
   result = result.replace(/'\[\]'::json/gi, "'[]'");
   result = result.replace(/default \(now\(\)\)/gi, 'DEFAULT CURRENT_TIMESTAMP(3)');
@@ -106,11 +109,11 @@ END;
   result = result.replace(/\s+using gin\s*\([^)]+\)/gi, '');
   result = result.replace(/\s+where\s+username is not null/gi, '');
 
-  // Trigger syntax
+  // Trigger syntax — MariaDB trigger names are database-global, so include table name.
   result = result.replace(/execute procedure set_updated_at\(\)/gi, 'SET NEW.updated_at = CURRENT_TIMESTAMP(3)');
   result = result.replace(
     /create trigger set_updated_at\s+before update on (\w+)\s+for each row\s+SET NEW\.updated_at = CURRENT_TIMESTAMP\(3\)/gi,
-    'CREATE TRIGGER set_updated_at BEFORE UPDATE ON $1 FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3)'
+    'CREATE TRIGGER $1_set_updated_at BEFORE UPDATE ON $1 FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3)'
   );
 
   // Remove Postgres-only table options
@@ -253,6 +256,44 @@ create unique index applications__protected_app_metadata_custom_domain
     /create unique index (\w+)\s+on (\w+) \(\s*\(([^)]+)\)\s*\);/gi,
     'create unique index $1 on $2 (($3));'
   );
+
+  // MariaDB does not allow subquery CHECK constraints — enforce in application code.
+  result = result
+    .replace(
+      /,\s*\n\s*(?:\/\*\*[\s\S]*?\*\/\s*\n\s*)?constraint\s+\w+\s*\n\s*check\s*\(\([\s\S]*?\)\s*=\s*'[^']*'\)/gi,
+      ''
+    )
+    .replace(
+      /,\s*\n\s*(?:\/\*\*[\s\S]*?\*\/\s*\n\s*)?constraint\s+\w+\s*\n\s*check\s*\(\([\s\S]*?\)\s+in\s*\([^)]*\)\)/gi,
+      ''
+    );
+
+  // BRIN / empty GIN leftovers
+  result = result.replace(
+    /(?:--[^\n]*\n)*create index \w+\s*\n\s*on \w+ using brin\s*\([^)]+\);\s*/gi,
+    ''
+  );
+  result = result.replace(/create(?:\s+unique)?\s+index\s+\w+\s*\n\s*on\s+\w+\s*;\s*/gi, '');
+
+  if (fileName === 'users.sql') {
+    result = result.replace(
+      /\/\*\s*Supports case-insensitive username lookups[\s\S]*?create index users__tenant_lower_username\s*\n\s*on users \(tenant_id, lower\(username\)\)(?:\s*where username is not null)?;\s*/i,
+      ''
+    );
+
+    if (!result.includes('username_lower')) {
+      result = result.replace(
+        /(updated_at DATETIME\(3\) not null DEFAULT CURRENT_TIMESTAMP\(3\),)/i,
+        `$1
+  username_lower varchar(128) as (lower(username)) virtual,`
+      );
+      result += `
+/* Supports case-insensitive username lookups and case-flip conflict detection. */
+create index users__tenant_lower_username
+  on users (tenant_id, username_lower);
+`;
+    }
+  }
 
   // References — MariaDB supports same FK syntax
   return result;
