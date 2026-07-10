@@ -113,6 +113,33 @@ END;
     'CREATE TRIGGER set_updated_at BEFORE UPDATE ON $1 FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3)'
   );
 
+  // Postgres expression indexes on JSON paths → MariaDB virtual columns + btree indexes
+  if (fileName === 'applications.sql') {
+    result = result.replace(
+      /create unique index applications__protected_app_metadata_host[\s\S]*?create unique index applications__protected_app_metadata_custom_domain[\s\S]*?\);/m,
+      ''
+    );
+    result = result.replace(
+      /(created_at DATETIME\(3\) not null DEFAULT CURRENT_TIMESTAMP\(3\),)/i,
+      `$1
+  protected_app_metadata_host char(255) as (json_unquote(json_extract(protected_app_metadata, '$.host'))) virtual,
+  protected_app_metadata_custom_domain char(255) as (json_unquote(json_extract(protected_app_metadata, '$.customDomains[0].domain'))) virtual,`
+    );
+    result += `
+create unique index applications__protected_app_metadata_host
+  on applications (protected_app_metadata_host);
+
+create unique index applications__protected_app_metadata_custom_domain
+  on applications (protected_app_metadata_custom_domain);
+`;
+  }
+
+  // Postgres json path indexes (fallback for other tables)
+  result = result.replace(
+    /create unique index (\w+)\s+on (\w+) \(\s*\(([^)]+)\)\s*\);/gi,
+    'create unique index $1 on $2 (($3));'
+  );
+
   // References — MariaDB supports same FK syntax
   return result;
 };

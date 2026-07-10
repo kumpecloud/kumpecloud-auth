@@ -16,6 +16,8 @@ create table applications (
   is_third_party boolean not null default false,
   app_level_access_control_enabled boolean not null default false,
   created_at DATETIME(3) not null DEFAULT CURRENT_TIMESTAMP(3),
+  protected_app_metadata_host char(255) as (json_unquote(json_extract(protected_app_metadata, '$.host'))) virtual,
+  protected_app_metadata_custom_domain char(255) as (json_unquote(json_extract(protected_app_metadata, '$.customDomains[0].domain'))) virtual,
   primary key (id)
 );
 
@@ -29,7 +31,7 @@ create index applications__type
   on applications (tenant_id, type);
 
 create unique index applications__protected_app_metadata_host
-  on applications ((cast(json_unquote(json_extract(protected_app_metadata, '$.host')) as char(255))));
+  on applications (protected_app_metadata_host);
 
 create unique index applications__protected_app_metadata_custom_domain
-  on applications ((cast(json_unquote(json_extract(protected_app_metadata, '$.customDomains[0].domain')) as char(255))));
+  on applications (protected_app_metadata_custom_domain);

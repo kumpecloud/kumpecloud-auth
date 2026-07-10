@@ -43,6 +43,11 @@ const parseTableColumns = (sql: string): Map<string, Set<string>> => {
         continue;
       }
 
+      // MariaDB-only generated virtual columns for JSON uniqueness indexes.
+      if (/\bas\s*\(/i.test(trimmed)) {
+        continue;
+      }
+
       const columnMatch = /^([a-z_][a-z0-9_]*)\s+\S+/i.exec(trimmed);
 
       if (columnMatch?.[1]) {
