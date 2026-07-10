@@ -24,16 +24,10 @@ create index oidc_model_instances__model_name_payload_uid
   on oidc_model_instances (tenant_id, model_name, payload_uid);
 
 create index oidc_model_instances__model_name_payload_grant_id_partial
-  on oidc_model_instances (tenant_id, model_name, payload_grant_id)
-  where payload_grant_id is not null;
+  on oidc_model_instances (tenant_id, model_name, payload_grant_id);
 
 create index oidc_model_instances__expires_at
   on oidc_model_instances (tenant_id, expires_at);
 
-create index oidc_model_instances__session_payload_account_id_expires_at
-  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
-  where model_name = 'Session';
-
-create index oidc_model_instances__grant_payload_account_id_expires_at
-  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
-  where model_name = 'Grant';
+create index oidc_model_instances__model_name_payload_account_id_expires_at
+  on oidc_model_instances (tenant_id, model_name, payload_account_id, expires_at);

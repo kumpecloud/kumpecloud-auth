@@ -25,10 +25,12 @@ create table organization_invitations (
   updated_at DATETIME(3) not null DEFAULT CURRENT_TIMESTAMP(3),
   /** The time when the invitation expires. */
   expires_at DATETIME(3) not null,
+  pending_invitee_organization varchar(300) as (
+    if(status = 'Pending', concat(tenant_id, ':', invitee, ':', organization_id), null)
+  ) virtual,
   primary key (id)
 );
 
 -- Ensure there is only one pending invitation for a given invitee and organization.
 create unique index organization_invitations__invitee_organization_id
-  on organization_invitations (tenant_id, invitee, organization_id)
-  where status = 'Pending';
+  on organization_invitations (pending_invitee_organization);

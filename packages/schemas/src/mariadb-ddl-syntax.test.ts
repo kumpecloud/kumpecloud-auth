@@ -13,6 +13,7 @@ const postgresOnlyPatterns = [
   { name: 'autovacuum settings', pattern: /autovacuum_/i },
   { name: 'timestamptz type', pattern: /\btimestamptz\b/i },
   { name: 'jsonb type', pattern: /\bjsonb\b/i },
+  { name: 'partial index where clause', pattern: /create\s+(?:unique\s+)?index[\s\S]*?\n\s+where\s+/i },
 ];
 
 describe('MariaDB DDL syntax', () => {

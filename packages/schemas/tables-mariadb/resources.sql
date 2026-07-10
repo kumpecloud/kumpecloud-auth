@@ -8,6 +8,7 @@ create table resources (
   indicator text not null, /* resource indicator also used as audience */
   is_default boolean not null default (false),
   access_token_ttl bigint not null default(3600), /* expiration value in seconds, default is 1h */
+  is_default_tenant_id varchar(21) as (if(is_default, tenant_id, null)) virtual,
   primary key (id),
   constraint resources__indicator
     unique (tenant_id, indicator)
@@ -17,5 +18,4 @@ create index resources__id
   on resources (tenant_id, id);
 
 create unique index resources__is_default_true
-  on resources (tenant_id)
-  where is_default = true;
+  on resources (is_default_tenant_id);

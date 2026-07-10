@@ -141,19 +141,63 @@ create index oidc_model_instances__model_name_payload_uid
   on oidc_model_instances (tenant_id, model_name, payload_uid);
 
 create index oidc_model_instances__model_name_payload_grant_id_partial
-  on oidc_model_instances (tenant_id, model_name, payload_grant_id)
-  where payload_grant_id is not null;
+  on oidc_model_instances (tenant_id, model_name, payload_grant_id);
 
 create index oidc_model_instances__expires_at
   on oidc_model_instances (tenant_id, expires_at);
 
-create index oidc_model_instances__session_payload_account_id_expires_at
-  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
-  where model_name = 'Session';
+create index oidc_model_instances__model_name_payload_account_id_expires_at
+  on oidc_model_instances (tenant_id, model_name, payload_account_id, expires_at);
+`;
+  }
 
-create index oidc_model_instances__grant_payload_account_id_expires_at
-  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
-  where model_name = 'Grant';
+  if (fileName === 'resources.sql') {
+    result = result.replace(
+      /create unique index resources__is_default_true[\s\S]*?where is_default = true;\s*/m,
+      ''
+    );
+    result = result.replace(
+      /(access_token_ttl bigint not null default\(3600\),)/i,
+      `$1
+  is_default_tenant_id varchar(21) as (if(is_default, tenant_id, null)) virtual,`
+    );
+    result += `
+create unique index resources__is_default_true
+  on resources (is_default_tenant_id);
+`;
+  }
+
+  if (fileName === 'saml_application_secrets.sql') {
+    result = result.replace(
+      /create unique index saml_application_secrets__unique_active_secret[\s\S]*?where active;\s*/m,
+      ''
+    );
+    result = result.replace(
+      /(active boolean not null,)/i,
+      `$1
+  active_application_id varchar(43) as (if(active, concat(tenant_id, ':', application_id), null)) virtual,`
+    );
+    result += `
+create unique index saml_application_secrets__unique_active_secret
+  on saml_application_secrets (active_application_id);
+`;
+  }
+
+  if (fileName === 'organization_invitations.sql') {
+    result = result.replace(
+      /create unique index organization_invitations__invitee_organization_id[\s\S]*?where status = 'Pending';\s*/m,
+      ''
+    );
+    result = result.replace(
+      /(expires_at DATETIME\(3\) not null,)/i,
+      `$1
+  pending_invitee_organization varchar(300) as (
+    if(status = 'Pending', concat(tenant_id, ':', invitee, ':', organization_id), null)
+  ) virtual,`
+    );
+    result += `
+create unique index organization_invitations__invitee_organization_id
+  on organization_invitations (pending_invitee_organization);
 `;
   }
 
