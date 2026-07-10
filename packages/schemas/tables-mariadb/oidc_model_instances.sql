@@ -8,43 +8,32 @@ create table oidc_model_instances (
   payload JSON /* @use OidcModelInstancePayload */ not null,
   expires_at DATETIME(3) not null,
   consumed_at DATETIME(3),
+  payload_user_code varchar(128) as (json_unquote(json_extract(payload, '$.userCode'))) virtual,
+  payload_uid varchar(128) as (json_unquote(json_extract(payload, '$.uid'))) virtual,
+  payload_grant_id varchar(128) as (json_unquote(json_extract(payload, '$.grantId'))) virtual,
+  payload_account_id varchar(128) as (json_unquote(json_extract(payload, '$.accountId'))) virtual,
   primary key (id),
   constraint oidc_model_instances__model_name_id
     unique (tenant_id, model_name, id)
 );
 
 create index oidc_model_instances__model_name_payload_user_code
-  on oidc_model_instances (
-    tenant_id,
-    model_name,
-    (payload->>'userCode')
-  );
+  on oidc_model_instances (tenant_id, model_name, payload_user_code);
 
 create index oidc_model_instances__model_name_payload_uid
-  on oidc_model_instances (
-    tenant_id,
-    model_name,
-    (payload->>'uid')
-  );
+  on oidc_model_instances (tenant_id, model_name, payload_uid);
 
 create index oidc_model_instances__model_name_payload_grant_id_partial
-  on oidc_model_instances (tenant_id, model_name, (payload->>'grantId'))
-  where payload ? 'grantId';
+  on oidc_model_instances (tenant_id, model_name, payload_grant_id)
+  where payload_grant_id is not null;
 
 create index oidc_model_instances__expires_at
   on oidc_model_instances (tenant_id, expires_at);
 
 create index oidc_model_instances__session_payload_account_id_expires_at
-  on oidc_model_instances (tenant_id, (payload->>'accountId'), expires_at)
-  WHERE model_name = 'Session';
+  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
+  where model_name = 'Session';
 
 create index oidc_model_instances__grant_payload_account_id_expires_at
-  on oidc_model_instances (tenant_id, (payload->>'accountId'), expires_at)
-  WHERE model_name = 'Grant';
-
-alter table oidc_model_instances set (
-  autovacuum_vacuum_scale_factor = 0.05,
-  autovacuum_analyze_scale_factor = 0.02,
-  autovacuum_vacuum_threshold = 5000,
-  autovacuum_analyze_threshold = 2000
-);
+  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
+  where model_name = 'Grant';

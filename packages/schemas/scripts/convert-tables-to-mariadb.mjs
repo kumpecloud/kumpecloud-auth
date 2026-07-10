@@ -113,7 +113,77 @@ END;
     'CREATE TRIGGER set_updated_at BEFORE UPDATE ON $1 FOR EACH ROW SET NEW.updated_at = CURRENT_TIMESTAMP(3)'
   );
 
+  // Remove Postgres-only table options
+  result = result.replace(
+    /alter table [\w.]+\s+set\s*\([\s\S]*?autovacuum_[\s\S]*?\);\s*/gi,
+    ''
+  );
+
   // Postgres expression indexes on JSON paths → MariaDB virtual columns + btree indexes
+  if (fileName === 'oidc_model_instances.sql') {
+    result = result.replace(
+      /create index oidc_model_instances__model_name_payload_user_code[\s\S]*?alter table oidc_model_instances set[\s\S]*?\);\s*/m,
+      ''
+    );
+    result = result.replace(
+      /(consumed_at DATETIME\(3\),)/i,
+      `$1
+  payload_user_code varchar(128) as (json_unquote(json_extract(payload, '$.userCode'))) virtual,
+  payload_uid varchar(128) as (json_unquote(json_extract(payload, '$.uid'))) virtual,
+  payload_grant_id varchar(128) as (json_unquote(json_extract(payload, '$.grantId'))) virtual,
+  payload_account_id varchar(128) as (json_unquote(json_extract(payload, '$.accountId'))) virtual,`
+    );
+    result += `
+create index oidc_model_instances__model_name_payload_user_code
+  on oidc_model_instances (tenant_id, model_name, payload_user_code);
+
+create index oidc_model_instances__model_name_payload_uid
+  on oidc_model_instances (tenant_id, model_name, payload_uid);
+
+create index oidc_model_instances__model_name_payload_grant_id_partial
+  on oidc_model_instances (tenant_id, model_name, payload_grant_id)
+  where payload_grant_id is not null;
+
+create index oidc_model_instances__expires_at
+  on oidc_model_instances (tenant_id, expires_at);
+
+create index oidc_model_instances__session_payload_account_id_expires_at
+  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
+  where model_name = 'Session';
+
+create index oidc_model_instances__grant_payload_account_id_expires_at
+  on oidc_model_instances (tenant_id, payload_account_id, expires_at)
+  where model_name = 'Grant';
+`;
+  }
+
+  if (fileName === 'logs.sql') {
+    result = result.replace(
+      /create index logs__user_id[\s\S]*?create index logs__created_at_id[\s\S]*?\);\s*/m,
+      ''
+    );
+    result = result.replace(
+      /(created_at DATETIME\(3\) not null DEFAULT CURRENT_TIMESTAMP\(3\),)/i,
+      `$1
+  payload_user_id varchar(128) as (json_unquote(json_extract(payload, '$.userId'))) virtual,
+  payload_application_id varchar(21) as (json_unquote(json_extract(payload, '$.applicationId'))) virtual,
+  payload_hook_id varchar(21) as (json_unquote(json_extract(payload, '$.hookId'))) virtual,`
+    );
+    result += `
+create index logs__user_id
+  on logs (tenant_id, payload_user_id);
+
+create index logs__application_id
+  on logs (tenant_id, payload_application_id);
+
+create index logs__hook_id
+  on logs (tenant_id, payload_hook_id);
+
+create index logs__created_at_id
+  on logs (tenant_id, created_at, id);
+`;
+  }
+
   if (fileName === 'applications.sql') {
     result = result.replace(
       /create unique index applications__protected_app_metadata_host[\s\S]*?create unique index applications__protected_app_metadata_custom_domain[\s\S]*?\);/m,
