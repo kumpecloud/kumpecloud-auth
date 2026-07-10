@@ -71,7 +71,9 @@ services:
     entrypoint:
       - sh
       - -c
-      - npm run cli db seed -- --swe --dapc && npm run cli db alteration deploy latest --dialect mariadb && npm run cli db alteration deploy next --dialect mariadb && exec npm start
+      # Dialect comes from DB_URL (mariadb://…). Do not pass --dialect through `npm run`
+      # without `--`, or npm swallows the flag and yargs sees a stray `mariadb` argument.
+      - npm run cli db seed -- --swe --dapc && npm run cli db alteration deploy latest && npm run cli db alteration deploy next && exec npm start
     healthcheck:
       test:
         [
