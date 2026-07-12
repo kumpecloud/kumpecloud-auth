@@ -63,7 +63,9 @@ export {
   assertTenantScopedSql,
   buildTenantSessionStatements,
   enforceTenantGuard,
+  injectTenantIsolationPredicate,
   tenantScopedTableNames,
+  tenantSessionPredicate,
   TenantGuardError,
   wrapPoolWithTenantGuard,
 } from './tenant-guard.js';

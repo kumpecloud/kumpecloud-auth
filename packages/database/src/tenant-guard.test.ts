@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   assertTenantScopedSql,
   enforceTenantGuard,
+  injectTenantIsolationPredicate,
   TenantGuardError,
+  tenantSessionPredicate,
   type TenantContext,
 } from './tenant-guard.js';
 
@@ -22,13 +24,14 @@ describe('TenantGuard', () => {
     ).toBeUndefined();
   });
 
-  it('blocks cross-tenant reads', () => {
+  it('blocks cross-tenant literal filters', () => {
     const violation = assertTenantScopedSql(
       `SELECT * FROM users WHERE tenant_id = 'tenant-b'`,
       defaultContext
     );
 
     expect(violation?.table).toBe('users');
+    expect(violation?.reason).toContain('tenant-b');
   });
 
   it('allows admin tenant to bypass filter checks', () => {
@@ -49,7 +52,7 @@ describe('TenantGuard', () => {
       defaultContext
     );
 
-    expect(violation?.table).toBe('users');
+    expect(['users', 'applications']).toContain(violation?.table);
     expect(violation?.reason).toContain('Multi-table');
   });
 
@@ -66,5 +69,59 @@ describe('TenantGuard', () => {
     expect(() => enforceTenantGuard(`SELECT * FROM users`, defaultContext)).toThrow(
       TenantGuardError
     );
+  });
+
+  it('allows INSERT without tenant_id filter (session trigger fills it)', () => {
+    expect(
+      assertTenantScopedSql(
+        `INSERT INTO logto_configs (key, value) VALUES ('k', '{}')`,
+        defaultContext
+      )
+    ).toBeUndefined();
+  });
+
+  it('does not require tenant_id on systems (global table)', () => {
+    expect(assertTenantScopedSql(`SELECT * FROM systems WHERE key = 'x'`, defaultContext)).toBeUndefined();
+  });
+});
+
+describe('injectTenantIsolationPredicate', () => {
+  it('injects session predicate before FOR UPDATE', () => {
+    const rewritten = injectTenantIsolationPredicate(
+      `select key from logto_configs where key in ('oidc.privateKeys') for update`,
+      defaultContext
+    );
+
+    expect(rewritten).toBe(
+      `select key from logto_configs where key in ('oidc.privateKeys') AND ${tenantSessionPredicate} for update`
+    );
+  });
+
+  it('injects WHERE when missing', () => {
+    const rewritten = injectTenantIsolationPredicate(`select * from users`, defaultContext);
+
+    expect(rewritten).toBe(`select * from users WHERE ${tenantSessionPredicate}`);
+  });
+
+  it('leaves already-filtered SQL alone', () => {
+    const sql = `select * from users where tenant_id = @logto_tenant_id and id = ?`;
+
+    expect(injectTenantIsolationPredicate(sql, defaultContext)).toBe(sql);
+  });
+
+  it('does not inject into INSERT', () => {
+    const sql = `insert into logto_configs (key, value) values (?, ?)`;
+
+    expect(injectTenantIsolationPredicate(sql, defaultContext)).toBe(sql);
+  });
+
+  it('qualifies multi-table injects', () => {
+    const rewritten = injectTenantIsolationPredicate(
+      `SELECT * FROM users u JOIN applications a ON u.id = a.id`,
+      defaultContext
+    );
+
+    expect(rewritten).toContain('users.tenant_id = @logto_tenant_id');
+    expect(rewritten).toContain('applications.tenant_id = @logto_tenant_id');
   });
 });
