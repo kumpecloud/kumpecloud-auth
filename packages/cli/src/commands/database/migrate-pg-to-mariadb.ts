@@ -66,14 +66,31 @@ export const toSnakeCaseColumn = (key: string) => (key.includes('_') ? key : dec
 const isTimestampField = (key: string) =>
   key === 'date' || key.endsWith('At') || key.endsWith('_at');
 
+/** MariaDB DATETIME rejects ISO-8601 (`…T…Z`); use SQL datetime literals instead. */
+export const toMariaDbDateTime = (value: Date | number | string): string => {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  const iso = date.toISOString(); // 2026-07-09T00:46:16.154Z
+
+  return iso.replace('T', ' ').replace(/Z$/i, '');
+};
+
 export const transformValueForMariaDb = (key: string, value: unknown) => {
   if (value instanceof Date) {
-    return value.toISOString();
+    return toMariaDbDateTime(value);
   }
 
   // Postgres/Slonik sometimes returns epoch millis for timestamp columns.
   if (isTimestampField(key) && typeof value === 'number' && Number.isFinite(value)) {
-    return new Date(value).toISOString();
+    return toMariaDbDateTime(value);
+  }
+
+  if (isTimestampField(key) && typeof value === 'string' && value.includes('T')) {
+    return toMariaDbDateTime(value);
   }
 
   if (value && typeof value === 'object' && !Buffer.isBuffer(value)) {

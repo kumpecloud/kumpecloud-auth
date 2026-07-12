@@ -51,12 +51,13 @@ describe('checksumRows', () => {
 
 describe('transformRowForMariaInsert', () => {
   it('decamelizes columns and normalizes timestamps/json', async () => {
-    const { transformRowForMariaInsert, toSnakeCaseColumn } = await import(
+    const { transformRowForMariaInsert, toSnakeCaseColumn, toMariaDbDateTime } = await import(
       './migrate-pg-to-mariadb.js'
     );
 
     expect(toSnakeCaseColumn('tenantId')).toBe('tenant_id');
     expect(toSnakeCaseColumn('oidc_client_metadata')).toBe('oidc_client_metadata');
+    expect(toMariaDbDateTime('2026-07-09T00:46:16.154Z')).toBe('2026-07-09 00:46:16.154');
 
     expect(
       transformRowForMariaInsert({
@@ -68,7 +69,7 @@ describe('transformRowForMariaInsert', () => {
     ).toEqual({
       tenant_id: 'admin',
       oidc_client_metadata: '{"redirectUris":[]}',
-      created_at: new Date(1_700_000_000_000).toISOString(),
+      created_at: toMariaDbDateTime(1_700_000_000_000),
       is_third_party: false,
     });
   });
