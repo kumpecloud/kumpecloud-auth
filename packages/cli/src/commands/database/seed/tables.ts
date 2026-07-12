@@ -262,7 +262,11 @@ export const seedTables = async (
     seedManagementApiProxyApplications(connection),
   ]);
 
-  await updateDatabaseTimestamp(connection, latestTimestamp);
+  await updateDatabaseTimestamp(
+    connection,
+    latestTimestamp,
+    getDatabaseDialectFromUrl(process.env.DB_URL ?? '')
+  );
 
   consoleLog.succeed('Seed data');
 };

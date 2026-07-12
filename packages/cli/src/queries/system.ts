@@ -1,4 +1,4 @@
-import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
+import { DatabaseDialect, getDatabaseDialectFromUrl, normalizeJsonValue } from '@logto/database';
 import type { AlterationState, System, SystemKey } from '@logto/schemas';
 import { systemGuards, Systems, AlterationStateKey } from '@logto/schemas';
 import type { Nullable } from '@silverhand/essentials';
@@ -63,7 +63,7 @@ export const getCurrentDatabaseAlterationTimestamp = async (
     const result = await pool.maybeOne<System>(
       sql`select * from ${table} where ${fields.key}=${stateKey}`
     );
-    const parsed = systemGuards[stateKey].safeParse(result?.value);
+    const parsed = systemGuards[stateKey].safeParse(normalizeJsonValue(result?.value));
 
     return (parsed.success && parsed.data.timestamp) || 0;
   } catch (error: unknown) {

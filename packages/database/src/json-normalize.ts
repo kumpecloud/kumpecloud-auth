@@ -20,3 +20,25 @@ export const normalizeJsonStringArray = (value: unknown): string[] => {
 
   return [];
 };
+
+/**
+ * MariaDB/mysql2 often returns JSON columns as strings. Coerce object/array JSON
+ * strings so Zod guards and app code see parsed values like Postgres jsonb.
+ */
+export const normalizeJsonValue = (value: unknown): unknown => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const trimmed = value.trim();
+
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+};

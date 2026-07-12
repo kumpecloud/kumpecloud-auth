@@ -55,7 +55,7 @@ export {
   getDatabaseDialectFromEnv,
 } from './sql-helpers.js';
 
-export { normalizeJsonStringArray } from './json-normalize.js';
+export { normalizeJsonStringArray, normalizeJsonValue } from './json-normalize.js';
 export { getMariaReturningLookupKeys } from './returning-lookup.js';
 export { oidcPayloadJsonPaths, userIdentitiesJsonPaths } from './json-paths.js';
 

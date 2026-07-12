@@ -2,6 +2,7 @@ import { sql, type DatabasePool, type QueryResult } from '@silverhand/slonik';
 import mysql from 'mysql2/promise';
 
 import { parseDatabaseUrl } from '../dialect.js';
+import { normalizeJsonValue } from '../json-normalize.js';
 import type { PoolFactoryOptions } from '../types.js';
 
 export type MariaDatabasePool = DatabasePool & { readonly dialect: 'mariadb' };
@@ -140,6 +141,14 @@ const toQueryResult = <R extends Record<string, unknown>>(
     notices: [],
   }) as QueryResult<R>;
 
+const parseJsonColumnsInRows = <R extends Record<string, unknown>>(rows: R[]): R[] =>
+  rows.map(
+    (row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key, normalizeJsonValue(value)])
+      ) as R
+  );
+
 const executeOnConnection = async <R extends Record<string, unknown>>(
   connection: mysql.PoolConnection,
   sqlOrToken: QueryInput,
@@ -150,7 +159,8 @@ const executeOnConnection = async <R extends Record<string, unknown>>(
     const [result] = await connection.query(rewritten, values as unknown[]);
 
     if (Array.isArray(result)) {
-      return toQueryResult(result as R[]);
+      // MariaDB often reports JSON columns as BLOB (252), so mysql2 leaves them as strings.
+      return toQueryResult(parseJsonColumnsInRows(result as R[]));
     }
 
     const header = result as mysql.ResultSetHeader;
@@ -164,7 +174,7 @@ const executeOnConnection = async <R extends Record<string, unknown>>(
   const [result] = await connection.query(mariaSql, serialized);
 
   if (Array.isArray(result)) {
-    return toQueryResult(result as R[]);
+    return toQueryResult(parseJsonColumnsInRows(result as R[]));
   }
 
   const header = result as mysql.ResultSetHeader;

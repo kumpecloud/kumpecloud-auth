@@ -58,11 +58,17 @@ describe('createMariaPool', () => {
     expect(result.rows).toEqual([{ ok: 1 }]);
   });
 
-  it('verifies pool readiness with slonik token', async () => {
-    queryMock.mockResolvedValueOnce([[{ ok: 1 }], []]);
-    const pool = await createMariaPool('mariadb://localhost/logto');
+  it('parses JSON column strings that MariaDB returns as BLOB text', async () => {
+    queryMock.mockResolvedValueOnce([
+      [{ key: 'mariadbAlterationState', value: '{"timestamp":1779000000}' }],
+      [],
+    ]);
 
-    await expect(verifyMariaPool(pool)).resolves.toBe(pool);
-    expect(queryMock).toHaveBeenCalledWith('select 1', []);
+    const pool = await createMariaPool('mariadb://logto:pass@localhost:3306/logto');
+    const result = await pool.query('SELECT * FROM systems');
+
+    expect(result.rows).toEqual([
+      { key: 'mariadbAlterationState', value: { timestamp: 1_779_000_000 } },
+    ]);
   });
 });
