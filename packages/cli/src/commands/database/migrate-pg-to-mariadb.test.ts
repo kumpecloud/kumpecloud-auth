@@ -48,3 +48,28 @@ describe('checksumRows', () => {
     expect(checksumRows(rows)).toBe(checksumRows([...rows].reverse()));
   });
 });
+
+describe('transformRowForMariaInsert', () => {
+  it('decamelizes columns and normalizes timestamps/json', async () => {
+    const { transformRowForMariaInsert, toSnakeCaseColumn } = await import(
+      './migrate-pg-to-mariadb.js'
+    );
+
+    expect(toSnakeCaseColumn('tenantId')).toBe('tenant_id');
+    expect(toSnakeCaseColumn('oidc_client_metadata')).toBe('oidc_client_metadata');
+
+    expect(
+      transformRowForMariaInsert({
+        tenantId: 'admin',
+        oidcClientMetadata: { redirectUris: [] },
+        createdAt: 1_700_000_000_000,
+        isThirdParty: false,
+      })
+    ).toEqual({
+      tenant_id: 'admin',
+      oidc_client_metadata: '{"redirectUris":[]}',
+      created_at: new Date(1_700_000_000_000).toISOString(),
+      is_third_party: false,
+    });
+  });
+});

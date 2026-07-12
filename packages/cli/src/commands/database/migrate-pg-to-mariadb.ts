@@ -11,6 +11,7 @@ import {
   type PostgresDatabasePool,
 } from '@logto/database';
 import { sql } from '@silverhand/slonik';
+import decamelize from 'decamelize';
 
 import { getPathInModule, consoleLog } from '../../utils.js';
 
@@ -59,21 +60,46 @@ export const getTableMigrationPlan = async (): Promise<TableMigrationPlan[]> => 
   return plans.sort((a, b) => a.initOrder - b.initOrder || a.table.localeCompare(b.table));
 };
 
-const transformRow = (row: Record<string, unknown>) => {
+/** Slonik camelCases keys; MariaDB DDL uses snake_case column names. */
+export const toSnakeCaseColumn = (key: string) => (key.includes('_') ? key : decamelize(key));
+
+const isTimestampField = (key: string) =>
+  key === 'date' || key.endsWith('At') || key.endsWith('_at');
+
+export const transformValueForMariaDb = (key: string, value: unknown) => {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  // Postgres/Slonik sometimes returns epoch millis for timestamp columns.
+  if (isTimestampField(key) && typeof value === 'number' && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+
+  if (value && typeof value === 'object' && !Buffer.isBuffer(value)) {
+    return JSON.stringify(value);
+  }
+
+  return value;
+};
+
+/** Normalize values for checksums; keep keys stable (camelCase from both pools). */
+export const transformRow = (row: Record<string, unknown>) => {
   const transformed: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(row)) {
-    if (value instanceof Date) {
-      transformed[key] = value.toISOString();
-      continue;
-    }
+    transformed[key] = transformValueForMariaDb(key, value);
+  }
 
-    if (value && typeof value === 'object' && !Buffer.isBuffer(value)) {
-      transformed[key] = JSON.stringify(value);
-      continue;
-    }
+  return transformed;
+};
 
-    transformed[key] = value;
+/** Prepare a row for MariaDB INSERT: snake_case columns + normalized values. */
+export const transformRowForMariaInsert = (row: Record<string, unknown>) => {
+  const transformed: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    transformed[toSnakeCaseColumn(key)] = transformValueForMariaDb(key, value);
   }
 
   return transformed;
@@ -290,10 +316,10 @@ export class MigrationService {
         continue;
       }
 
-      const columns = Object.keys(rows[0]!);
+      const columns = Object.keys(transformRowForMariaInsert(rows[0]!));
 
       for (let index = 0; index < rows.length; index += pageSize) {
-        const batch = rows.slice(index, index + pageSize).map(transformRow);
+        const batch = rows.slice(index, index + pageSize).map(transformRowForMariaInsert);
         const placeholders = batch
           .map(() => `(${columns.map(() => '?').join(', ')})`)
           .join(', ');
