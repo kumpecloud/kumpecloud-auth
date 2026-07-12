@@ -8,6 +8,21 @@ const quoteIdentifier = (name: string) => `\`${name.replaceAll('`', '``')}\``;
 const toIdentifier = (value: string | IdentifierSqlToken): IdentifierSqlToken =>
   typeof value === 'string' ? sql.identifier([value]) : value;
 
+/** Resolve a string or Slonik identifier token to a bare column name for VALUES(). */
+export const resolveColumnName = (field: string | IdentifierSqlToken): string => {
+  if (typeof field === 'string') {
+    return field;
+  }
+
+  const name = field.names.at(-1);
+
+  if (!name) {
+    throw new TypeError('IdentifierSqlToken must include at least one name');
+  }
+
+  return name;
+};
+
 export const mariaQueryDialect: QueryDialect = {
   dialect: DatabaseDialect.MariaDB,
 
@@ -22,7 +37,7 @@ export const mariaQueryDialect: QueryDialect = {
 
     const updates = config.setExcludedFields
       .map((field) => {
-        const name = typeof field === 'string' ? field : String(field);
+        const name = resolveColumnName(field);
         return `${quoteIdentifier(name)} = VALUES(${quoteIdentifier(name)})`;
       })
       .join(', ');
