@@ -7,6 +7,7 @@ import {
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
+import { deleteReturningOne } from '#src/database/returning.js';
 import RequestError from '#src/errors/RequestError/index.js';
 import { DeletionError } from '#src/errors/SlonikError/index.js';
 import { convertToIdentifiers } from '#src/utils/sql.js';
@@ -75,19 +76,25 @@ export class ApplicationSecretQueries {
   }
 
   async deleteByName(appId: string, name: string) {
-    const {
-      rowCount,
-      rows: [deletedSecret],
-    } = await this.pool.query<ApplicationSecret>(sql`
-      delete from ${table}
-        where ${fields.applicationId} = ${appId}
-        and ${fields.name} = ${name}
-      returning ${sql.join(Object.values(fields), sql`, `)}
-    `);
-    if (rowCount < 1 || !deletedSecret) {
+    const { row, rowCount } = await deleteReturningOne<ApplicationSecret>(this.pool, {
+      selectBeforeDeleteSql: sql`
+        select ${sql.join(Object.values(fields), sql`, `)}
+          from ${table}
+          where ${fields.applicationId} = ${appId}
+          and ${fields.name} = ${name}
+      `,
+      deleteSql: sql`
+        delete from ${table}
+          where ${fields.applicationId} = ${appId}
+          and ${fields.name} = ${name}
+        returning ${sql.join(Object.values(fields), sql`, `)}
+      `,
+    });
+
+    if (rowCount < 1 || !row) {
       throw new DeletionError(ApplicationSecrets.table, name);
     }
 
-    return deletedSecret;
+    return row;
   }
 }

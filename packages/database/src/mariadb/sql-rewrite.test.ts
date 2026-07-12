@@ -30,4 +30,21 @@ describe('rewritePostgresSqlForMariaDB', () => {
       rewritePostgresSqlForMariaDB(`select * from users where custom_data ? 'amember'`)
     ).toBe(`select * from users where JSON_CONTAINS_PATH(custom_data, 'one', '$.amember')`);
   });
+
+  it('rewrites jsonb text extract, timestamps, and casts', () => {
+    expect(
+      rewritePostgresSqlForMariaDB(`select payload->>'uid' from oidc_model_instances`)
+    ).toBe(`select JSON_UNQUOTE(JSON_EXTRACT(payload, '$.uid')) from oidc_model_instances`);
+    expect(
+      rewritePostgresSqlForMariaDB(
+        `select to_timestamp($1::double precision / 1000), to_timestamp($2)`
+      )
+    ).toBe(`select FROM_UNIXTIME($1 / 1000), FROM_UNIXTIME($2)`);
+    expect(rewritePostgresSqlForMariaDB(`select json_build_object('id', id)`)).toBe(
+      `select JSON_OBJECT('id', id)`
+    );
+    expect(
+      rewritePostgresSqlForMariaDB(`select * from users where jsonb_array_length(mfa_verifications) > 0`)
+    ).toBe(`select * from users where JSON_LENGTH(mfa_verifications) > 0`);
+  });
 });

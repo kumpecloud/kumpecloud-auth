@@ -4,6 +4,7 @@ import {
   type OidcSessionExtension,
   OidcModelInstances,
 } from '@logto/schemas';
+import { buildJsonTextEquals, getDatabaseDialectFromEnv } from '@logto/database';
 import { type Nullable } from '@silverhand/essentials';
 import { sql, type CommonQueryMethods } from '@silverhand/slonik';
 
@@ -37,6 +38,8 @@ export class OidcSessionExtensionsQueries {
     },
     returning: true,
   });
+
+  readonly #dialect = getDatabaseDialectFromEnv();
 
   constructor(public readonly pool: CommonQueryMethods) {}
 
@@ -80,10 +83,10 @@ export class OidcSessionExtensionsQueries {
       )}
       from ${modelInstanceTable}
       left join ${table}
-        on ${modelInstanceFields.payload} ->> 'uid' = ${fields.sessionUid}
+        on ${buildJsonTextEquals(modelInstanceFields.payload, 'uid', fields.sessionUid, this.#dialect)}
         and ${fields.accountId} = ${accountId}
       where ${modelInstanceFields.modelName} = ${sessionModelName}
-        and ${modelInstanceFields.payload} ->> 'accountId' = ${accountId}
+        and ${buildJsonTextEquals(modelInstanceFields.payload, 'accountId', accountId, this.#dialect)}
         and ${modelInstanceFields.expiresAt} > ${convertToTimestamp()}
     `);
   }
@@ -106,11 +109,11 @@ export class OidcSessionExtensionsQueries {
       )}
       from ${modelInstanceTable}
       left join ${table}
-        on ${modelInstanceFields.payload} ->> 'uid' = ${fields.sessionUid}
+        on ${buildJsonTextEquals(modelInstanceFields.payload, 'uid', fields.sessionUid, this.#dialect)}
         and ${fields.accountId} = ${accountId}
       where ${modelInstanceFields.modelName} = ${sessionModelName}
-        and ${modelInstanceFields.payload} ->> 'accountId' = ${accountId}
-        and ${modelInstanceFields.payload} ->> 'uid' = ${sessionUid}
+        and ${buildJsonTextEquals(modelInstanceFields.payload, 'accountId', accountId, this.#dialect)}
+        and ${buildJsonTextEquals(modelInstanceFields.payload, 'uid', sessionUid, this.#dialect)}
         and ${modelInstanceFields.expiresAt} > ${convertToTimestamp()}
     `);
   }

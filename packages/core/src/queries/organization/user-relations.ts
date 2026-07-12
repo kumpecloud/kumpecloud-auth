@@ -9,6 +9,7 @@ import {
   type FeaturedUser,
   userInfoSelectFields,
 } from '@logto/schemas';
+import { buildInArrayCondition, DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { sql, type CommonQueryMethods } from '@silverhand/slonik';
 
 import { type SearchOptions, buildSearchSql, expandFields } from '#src/database/utils.js';
@@ -21,6 +22,8 @@ import { aggregateRoles } from './utils.js';
 
 /** The query class for the organization - user relation. */
 export class UserRelationQueries extends TwoRelationsQueries<typeof Organizations, typeof Users> {
+  readonly #dialect = getDatabaseDialectFromEnv();
+
   constructor(pool: CommonQueryMethods) {
     super(pool, OrganizationUserRelations.table, Organizations, Users);
   }
@@ -42,7 +45,7 @@ export class UserRelationQueries extends TwoRelationsQueries<typeof Organization
       select ${fields.userId}
       from ${this.table}
       where ${fields.organizationId} = ${organizationId}
-        and ${fields.userId} = any(${sql.array(userIds, 'varchar')})
+        and ${buildInArrayCondition(fields.userId, userIds, this.#dialect)}
     `);
 
     return rows.map((row) => row.userId);
@@ -59,7 +62,7 @@ export class UserRelationQueries extends TwoRelationsQueries<typeof Organization
       select ${fields.organizationId}
       from ${this.table}
       where ${fields.userId} = ${userId}
-        and ${fields.organizationId} = any(${sql.array(organizationIds, 'varchar')})
+        and ${buildInArrayCondition(fields.organizationId, organizationIds, this.#dialect)}
     `);
 
     return rows.map((row) => row.organizationId);
@@ -124,7 +127,7 @@ export class UserRelationQueries extends TwoRelationsQueries<typeof Organization
     return this.pool.any<OrganizationWithRoles>(sql`
       select
         ${expandFields(Organizations, true)},
-        ${aggregateRoles()}
+        ${aggregateRoles('organizationRoles', this.#dialect)}
       from ${this.table}
       left join ${organizations.table}
         on ${fields.organizationId} = ${organizations.fields.id}
@@ -161,6 +164,51 @@ export class UserRelationQueries extends TwoRelationsQueries<typeof Organization
       `
       : sql``;
 
+    const rolesSelect =
+      this.#dialect === DatabaseDialect.MariaDB
+        ? sql`
+            coalesce((
+              select JSON_ARRAYAGG(
+                JSON_OBJECT(
+                  'id', ${roles.fields.id},
+                  'name', ${roles.fields.name}
+                )
+                ORDER BY ${roles.fields.name}
+              )
+              from ${relations.table}
+              join ${roles.table}
+                on ${relations.fields.organizationRoleId} = ${roles.fields.id}
+              where ${relations.fields.organizationId} = ${organizationId}
+                and ${relations.fields.userId} = ${users.fields.id}
+            ), JSON_ARRAY()) as ${sql.identifier(['organizationRoles'])}
+          `
+        : sql`
+            user_roles.${sql.identifier(['organizationRoles'])}
+          `;
+
+    const rolesJoin =
+      this.#dialect === DatabaseDialect.MariaDB
+        ? sql``
+        : sql`
+            left join lateral (
+              select coalesce(
+                json_agg(
+                  json_build_object(
+                    'id', ${roles.fields.id},
+                    'name', ${roles.fields.name}
+                  )
+                  order by ${roles.fields.name}
+                ),
+                '[]'::json
+              ) as ${sql.identifier(['organizationRoles'])}
+              from ${relations.table}
+              join ${roles.table}
+                on ${relations.fields.organizationRoleId} = ${roles.fields.id}
+              where ${relations.fields.organizationId} = ${organizationId}
+                and ${relations.fields.userId} = ${users.fields.id}
+            ) as user_roles on true
+          `;
+
     const [{ count }, entities] = await Promise.all([
       this.pool.one<{ count: string }>(sql`
         select count(*)
@@ -171,37 +219,19 @@ export class UserRelationQueries extends TwoRelationsQueries<typeof Organization
         ${organizationRoleFilterSql}
         ${buildSearchSql(Users, search, sql`and `)}
       `),
-      // Aggregate roles via LATERAL so the per-user role lookup runs at most `limit` times
-      // instead of once over the full join. `order by` is explicit because the prior
-      // GROUP BY's ordering was incidental (Postgres does not guarantee GROUP BY ordering)
-      // and the rewrite removes the implementation accident that made it appear stable.
+      // Aggregate roles via LATERAL (Postgres) or correlated subquery (MariaDB) so the
+      // per-user role lookup runs at most `limit` times instead of once over the full join.
       this.pool.any<UserWithOrganizationRoles>(sql`
         select
           ${sql.join(
             userInfoSelectFields.map((field) => users.fields[field]),
             sql`, `
           )},
-          user_roles.${sql.identifier(['organizationRoles'])}
+          ${rolesSelect}
         from ${this.table}
         left join ${users.table}
           on ${fields.userId} = ${users.fields.id}
-        left join lateral (
-          select coalesce(
-            json_agg(
-              json_build_object(
-                'id', ${roles.fields.id},
-                'name', ${roles.fields.name}
-              )
-              order by ${roles.fields.name}
-            ),
-            '[]'::json
-          ) as ${sql.identifier(['organizationRoles'])}
-          from ${relations.table}
-          join ${roles.table}
-            on ${relations.fields.organizationRoleId} = ${roles.fields.id}
-          where ${relations.fields.organizationId} = ${organizationId}
-            and ${relations.fields.userId} = ${users.fields.id}
-        ) as user_roles on true
+        ${rolesJoin}
         where ${fields.organizationId} = ${organizationId}
         ${organizationRoleFilterSql}
         ${buildSearchSql(Users, search, sql`and `)}

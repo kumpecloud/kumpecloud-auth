@@ -7,6 +7,7 @@ import {
   createCloudConnectionConfig,
   AdminTenantRole,
 } from '@logto/schemas';
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '@logto/database';
 import { GlobalValues } from '@logto/shared';
 import { appendPath } from '@silverhand/essentials';
 import type { CommonQueryMethods } from '@silverhand/slonik';
@@ -14,6 +15,9 @@ import { sql } from '@silverhand/slonik';
 
 import { insertInto } from '../../../database.js';
 import { consoleLog } from '../../../utils.js';
+
+const getDialectFromEnv = () =>
+  process.env.DB_URL ? getDatabaseDialectFromUrl(process.env.DB_URL) : DatabaseDialect.Postgres;
 
 /**
  * Append Redirect URIs for the default tenant callback in cloud Admin Console.
@@ -31,21 +35,46 @@ export const appendAdminConsoleRedirectUris = async (pool: CommonQueryMethods) =
     );
 
   const metadataKey = sql.identifier(['oidc_client_metadata']);
+  const dialect = getDialectFromEnv();
 
-  // Copied from packages/cloud/src/queries/tenants.ts
-  // Can be merged into the original once we remove slonik
-  await pool.query(sql`
-    update applications
-    set ${metadataKey} = jsonb_set(
-      ${metadataKey},
-      '{redirectUris}',
-      (select jsonb_agg(distinct value) from jsonb_array_elements(
-        ${metadataKey}->'redirectUris' || ${sql.jsonb(redirectUris.map(String))}
-      ))
-    )
-    where id = ${adminConsoleApplicationId}
-    and tenant_id = ${adminTenantId}
-  `);
+  if (dialect === DatabaseDialect.MariaDB) {
+    // Merge distinct redirect URIs into the JSON array under $.redirectUris.
+    await pool.query(sql`
+      update applications
+      set ${metadataKey} = JSON_SET(
+        COALESCE(${metadataKey}, JSON_OBJECT()),
+        '$.redirectUris',
+        (
+          select COALESCE(JSON_ARRAYAGG(uri), JSON_ARRAY())
+          from (
+            select distinct uri
+            from JSON_TABLE(
+              JSON_MERGE_PRESERVE(
+                COALESCE(JSON_EXTRACT(${metadataKey}, '$.redirectUris'), JSON_ARRAY()),
+                CAST(${JSON.stringify(redirectUris.map(String))} AS JSON)
+              ),
+              '$[*]' columns (uri varchar(2048) path '$')
+            ) as uris
+          ) distinct_uris
+        )
+      )
+      where id = ${adminConsoleApplicationId}
+      and tenant_id = ${adminTenantId}
+    `);
+  } else {
+    await pool.query(sql`
+      update applications
+      set ${metadataKey} = jsonb_set(
+        ${metadataKey},
+        '{redirectUris}',
+        (select jsonb_agg(distinct value) from jsonb_array_elements(
+          ${metadataKey}->'redirectUris' || ${sql.jsonb(redirectUris.map(String))}
+        ))
+      )
+      where id = ${adminConsoleApplicationId}
+      and tenant_id = ${adminTenantId}
+    `);
+  }
 
   consoleLog.succeed('Appended initial Redirect URIs to Admin Console:', redirectUris.map(String));
 };

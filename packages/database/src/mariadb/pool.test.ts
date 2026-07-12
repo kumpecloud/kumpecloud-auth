@@ -80,6 +80,8 @@ describe('createMariaPool', () => {
           is_third_party: 0,
           app_level_access_control_enabled: 1,
           tenant_id: 'admin',
+          created_at: new Date('2024-01-01T00:00:00.000Z'),
+          enabled: 1,
         },
       ],
       [],
@@ -94,6 +96,8 @@ describe('createMariaPool', () => {
         isThirdParty: false,
         appLevelAccessControlEnabled: true,
         tenantId: 'admin',
+        createdAt: Date.parse('2024-01-01T00:00:00.000Z'),
+        enabled: true,
       },
     ]);
   });

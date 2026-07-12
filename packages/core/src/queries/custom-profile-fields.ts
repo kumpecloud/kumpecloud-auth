@@ -3,6 +3,7 @@ import {
   type UpdateCustomProfileFieldSieOrder,
   CustomProfileFields,
 } from '@logto/schemas';
+import { DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import {
@@ -16,6 +17,8 @@ import { convertToIdentifiers } from '#src/utils/sql.js';
 const { table, fields } = convertToIdentifiers(CustomProfileFields);
 
 export const createCustomProfileFieldsQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
+
   const findAllCustomProfileFields = async () => {
     return pool.any<CustomProfileField>(sql`
       select ${sql.join(Object.values(fields), sql`, `)}
@@ -68,6 +71,36 @@ export const createCustomProfileFieldsQueries = (pool: CommonQueryMethods) => {
   const updateFieldOrderInSignInExperience = async (
     data: UpdateCustomProfileFieldSieOrder[]
   ): Promise<readonly CustomProfileField[]> => {
+    if (data.length === 0) {
+      return [];
+    }
+
+    if (dialect === DatabaseDialect.MariaDB) {
+      await pool.query(sql`
+        update ${table}
+        set ${fields.sieOrder} = case ${fields.name}
+          ${sql.join(
+            data.map(({ name, sieOrder }) => sql`when ${name} then ${sieOrder}`),
+            sql` `
+          )}
+        end
+        where ${fields.name} in (${sql.join(
+          data.map(({ name }) => sql`${name}`),
+          sql`, `
+        )})
+      `);
+
+      return pool.any<CustomProfileField>(sql`
+        select ${sql.join(Object.values(fields), sql`, `)}
+        from ${table}
+        where ${fields.name} in (${sql.join(
+          data.map(({ name }) => sql`${name}`),
+          sql`, `
+        )})
+        order by ${fields.sieOrder}
+      `);
+    }
+
     return pool.any<CustomProfileField>(sql`
       with updated_fields as (
         update ${table}

@@ -1,5 +1,10 @@
 import { DailyTokenUsage } from '@logto/schemas';
 import { generateStandardId } from '@logto/shared';
+import {
+  buildUnixTimestampFromMillis,
+  DatabaseDialect,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 import { z } from 'zod';
@@ -24,6 +29,8 @@ export const tokenUsageCountsGuard = z.object({
 export type TokenUsageCounts = z.infer<typeof tokenUsageCountsGuard>;
 
 export const createDailyTokenUsageQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
+
   /**
    * Record the token usage of the current date.
    *
@@ -54,6 +61,38 @@ export const createDailyTokenUsageQueries = (pool: CommonQueryMethods) => {
         ? sql`${fieldsWithPrefix.m2mTokenUsage} + 1`
         : sql`${fieldsWithPrefix.m2mTokenUsage}`;
 
+    const dateValue = buildUnixTimestampFromMillis(getUtcStartOfTheDay(date).getTime(), dialect);
+
+    // MariaDB has no RETURNING; upsert then select.
+    if (dialect === DatabaseDialect.MariaDB) {
+      await pool.query(sql`
+        insert into ${table} (
+          ${fields.id},
+          ${fields.date},
+          ${fields.usage},
+          ${fields.userTokenUsage},
+          ${fields.m2mTokenUsage}
+        )
+        values (
+          ${generateStandardId()},
+          ${dateValue},
+          1,
+          ${type === TokenUsageType.User ? 1 : 0},
+          ${type === TokenUsageType.M2m ? 1 : 0}
+        )
+        on duplicate key update
+          ${fields.usage} = ${fieldsWithPrefix.usage} + 1,
+          ${fields.userTokenUsage} = ${userTokenIncrement},
+          ${fields.m2mTokenUsage} = ${m2mTokenIncrement}
+      `);
+
+      return pool.one<DailyTokenUsage>(sql`
+        select ${sql.join(Object.values(fields), sql`, `)}
+        from ${table}
+        where ${fields.date} = ${dateValue}
+      `);
+    }
+
     return pool.one<DailyTokenUsage>(sql`
       insert into ${table} (
         ${fields.id},
@@ -64,7 +103,7 @@ export const createDailyTokenUsageQueries = (pool: CommonQueryMethods) => {
       )
       values (
         ${generateStandardId()},
-        to_timestamp(${getUtcStartOfTheDay(date).getTime()}::double precision / 1000),
+        ${dateValue},
         1,
         ${type === TokenUsageType.User ? 1 : 0},
         ${type === TokenUsageType.M2m ? 1 : 0}
@@ -84,12 +123,14 @@ export const createDailyTokenUsageQueries = (pool: CommonQueryMethods) => {
           coalesce(sum(${fields.userTokenUsage}), 0) as user_token_usage,
           coalesce(sum(${fields.m2mTokenUsage}), 0) as m2m_token_usage
         from ${table}
-        where ${fields.date} >= to_timestamp(${getUtcStartOfTheDay(
-          from
-        ).getTime()}::double precision / 1000)
-          and ${fields.date} < to_timestamp(${getUtcStartOfTheDay(
-            to
-          ).getTime()}::double precision / 1000)
+        where ${fields.date} >= ${buildUnixTimestampFromMillis(
+          getUtcStartOfTheDay(from).getTime(),
+          dialect
+        )}
+          and ${fields.date} < ${buildUnixTimestampFromMillis(
+            getUtcStartOfTheDay(to).getTime(),
+            dialect
+          )}
       `);
   };
 

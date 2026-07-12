@@ -1,4 +1,5 @@
 import { UserGeoLocations, type UserGeoLocation as UserGeoLocationEntity } from '@logto/schemas';
+import { DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import { convertToIdentifiers } from '#src/utils/sql.js';
@@ -6,6 +7,8 @@ import { convertToIdentifiers } from '#src/utils/sql.js';
 const { table, fields } = convertToIdentifiers(UserGeoLocations);
 
 export const createUserGeoLocationQueries = (pool: CommonQueryMethods) => {
+  const dialect = getDatabaseDialectFromEnv();
+
   const findUserGeoLocationByUserId = async (userId: string) =>
     pool.maybeOne<UserGeoLocationEntity>(sql`
       select ${sql.join(Object.values(fields), sql`, `)}
@@ -19,6 +22,28 @@ export const createUserGeoLocationQueries = (pool: CommonQueryMethods) => {
     const shouldUpdateCoordinates = hasLatitude && hasLongitude;
     const normalizedLatitude = shouldUpdateCoordinates ? latitude : null;
     const normalizedLongitude = shouldUpdateCoordinates ? longitude : null;
+
+    if (dialect === DatabaseDialect.MariaDB) {
+      await pool.query(sql`
+        insert into ${table} (
+          ${fields.userId},
+          ${fields.latitude},
+          ${fields.longitude},
+          ${fields.updatedAt}
+        )
+        values (${userId}, ${normalizedLatitude}, ${normalizedLongitude}, now())
+        on duplicate key update
+          ${fields.latitude} = coalesce(values(${fields.latitude}), ${table}.${fields.latitude}),
+          ${fields.longitude} = coalesce(values(${fields.longitude}), ${table}.${fields.longitude}),
+          ${fields.updatedAt} = now()
+      `);
+
+      return pool.one<UserGeoLocationEntity>(sql`
+        select ${sql.join(Object.values(fields), sql`, `)}
+        from ${table}
+        where ${fields.userId} = ${userId}
+      `);
+    }
 
     return pool.one<UserGeoLocationEntity>(sql`
       insert into ${table} (

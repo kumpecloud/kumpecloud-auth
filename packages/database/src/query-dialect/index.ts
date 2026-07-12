@@ -1,4 +1,4 @@
-import { DatabaseDialect, parseDatabaseUrl } from '../dialect.js';
+import { DatabaseDialect, getDatabaseDialectFromUrl } from '../dialect.js';
 import type { QueryDialect } from '../types.js';
 import { mariaQueryDialect } from './mariadb.js';
 import { postgresQueryDialect } from './postgres.js';
@@ -15,6 +15,6 @@ export const getQueryDialect = (dialect: DatabaseDialect): QueryDialect => {
 };
 
 export const getQueryDialectFromUrl = (databaseUrl: string): QueryDialect =>
-  getQueryDialect(parseDatabaseUrl(databaseUrl).dialect);
+  getQueryDialect(getDatabaseDialectFromUrl(databaseUrl));
 
 export { mariaQueryDialect, postgresQueryDialect };

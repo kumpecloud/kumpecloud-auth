@@ -7,6 +7,10 @@
  * we should remove the dependency on `slonik` at all, and this may not be an issue then.)
  */
 
+import {
+  buildUnixTimestampFromMillis,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 import { type SchemaValue, type SchemaValuePrimitive, type Table } from '@logto/shared';
 import { type IdentifierSqlToken, type SqlToken, sql } from '@silverhand/slonik';
 
@@ -35,7 +39,7 @@ export const convertToPrimitiveOrSql = (
     (['_at', 'At'].some((value) => key.endsWith(value)) || key === 'date') &&
     typeof value === 'number'
   ) {
-    return sql`to_timestamp(${value}::double precision / 1000)`;
+    return buildUnixTimestampFromMillis(value, getDatabaseDialectFromEnv());
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {

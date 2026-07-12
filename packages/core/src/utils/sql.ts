@@ -3,6 +3,11 @@ import type { Falsy } from '@silverhand/essentials';
 import { notFalsy } from '@silverhand/essentials';
 import type { SqlSqlToken, SqlToken, IdentifierSqlToken, QueryResult } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
+import {
+  buildUnixTimestampFromMillis,
+  buildUnixTimestampFromSeconds,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 
 export const conditionalSql = <T>(value: T, buildSql: (value: Exclude<T, Falsy>) => SqlSqlToken) =>
   notFalsy(value) ? buildSql(value) : sql``;
@@ -58,7 +63,7 @@ export const convertToPrimitiveOrSql = (
     (['_at', 'At'].some((value) => key.endsWith(value)) || key === 'date') &&
     typeof value === 'number'
   ) {
-    return sql`to_timestamp(${value}::double precision / 1000)`;
+    return buildUnixTimestampFromMillis(value, getDatabaseDialectFromEnv());
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -98,7 +103,7 @@ export const convertToIdentifiers = <Key extends string>(
 };
 
 export const convertToTimestamp = (time = new Date()) =>
-  sql`to_timestamp(${time.valueOf() / 1000})`;
+  buildUnixTimestampFromSeconds(time.valueOf() / 1000, getDatabaseDialectFromEnv());
 
 export const manyRows = async <T>(query: Promise<QueryResult<T>>): Promise<readonly T[]> => {
   const { rows } = await query;

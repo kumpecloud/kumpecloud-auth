@@ -1,11 +1,14 @@
 import type { IdentifierSqlToken, SqlSqlToken, ValueExpression } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
-import { DatabaseDialect, parseDatabaseUrl } from './dialect.js';
+import { DatabaseDialect, getDatabaseDialectFromUrl } from './dialect.js';
 import { oidcPayloadJsonPaths, userIdentitiesJsonPaths } from './json-paths.js';
 
 export const getDatabaseDialectFromEnv = (): DatabaseDialect =>
-  parseDatabaseUrl(process.env.DB_URL ?? '').dialect;
+  getDatabaseDialectFromUrl(process.env.DB_URL ?? '');
+
+/** Quote a JSON object key as a SQL string literal (for Postgres operators). */
+const sqlStringLiteral = (value: string) => sql.raw(`'${value.replaceAll("'", "''")}'`);
 
 export const buildInArrayCondition = (
   column: IdentifierSqlToken,
@@ -57,7 +60,58 @@ export const buildJsonHasKey = (
     return sql`JSON_CONTAINS_PATH(${column}, 'one', ${`$.${key}`})`;
   }
 
-  return sql`${column} ? ${key}`;
+  return sql`${column} ? ${sqlStringLiteral(key)}`;
+};
+
+/** Postgres `column->>'key'` text extract. */
+export const buildJsonTextExtract = (
+  column: IdentifierSqlToken,
+  key: string,
+  dialect: DatabaseDialect
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`JSON_UNQUOTE(JSON_EXTRACT(${column}, ${`$.${key}`}))`;
+  }
+
+  return sql`${column}->>${sqlStringLiteral(key)}`;
+};
+
+/** Postgres `column->>'key' = value`. */
+export const buildJsonTextEquals = (
+  column: IdentifierSqlToken,
+  key: string,
+  value: ValueExpression,
+  dialect: DatabaseDialect
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`JSON_UNQUOTE(JSON_EXTRACT(${column}, ${`$.${key}`})) = ${value}`;
+  }
+
+  return sql`${column}->>${sqlStringLiteral(key)}=${value}`;
+};
+
+/** Epoch milliseconds → dialect timestamp literal (for VALUES / comparisons). */
+export const buildUnixTimestampFromMillis = (
+  millis: number,
+  dialect: DatabaseDialect
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`FROM_UNIXTIME(${millis} / 1000)`;
+  }
+
+  return sql`to_timestamp(${millis}::double precision / 1000)`;
+};
+
+/** Epoch seconds → dialect timestamp literal (JS already divided by 1000). */
+export const buildUnixTimestampFromSeconds = (
+  seconds: number,
+  dialect: DatabaseDialect
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`FROM_UNIXTIME(${seconds})`;
+  }
+
+  return sql`to_timestamp(${seconds})`;
 };
 
 export const buildJsonRemoveKey = (

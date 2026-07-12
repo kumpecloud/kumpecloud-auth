@@ -19,8 +19,22 @@ type QueryInput = SlonikQueryToken | string;
 export const camelCaseColumnName = (name: string): string =>
   name.replaceAll(/_([a-z0-9])/gi, (_, char: string) => String(char).toUpperCase());
 
+const booleanishExactNames = new Set([
+  'enabled',
+  'consumed',
+  'required',
+  'active',
+  'syncProfile',
+  'enableTokenStorage',
+  'hideLogtoBranding',
+  'autoSendAuthorizationRequest',
+  'consentRequired',
+  'rotateRefreshToken',
+]);
+
 /** MariaDB TINYINT(1) comes back as 0/1; coerce common boolean column names to real booleans. */
 export const isBooleanishColumnName = (camelKey: string): boolean =>
+  booleanishExactNames.has(camelKey) ||
   /^(is|has|was|can|should)[A-Z]/.test(camelKey) ||
   camelKey.endsWith('Enabled') ||
   camelKey.endsWith('Disabled');
@@ -28,6 +42,18 @@ export const isBooleanishColumnName = (camelKey: string): boolean =>
 export const coerceBooleanishValue = (camelKey: string, value: unknown): unknown => {
   if ((value === 0 || value === 1) && isBooleanishColumnName(camelKey)) {
     return value === 1;
+  }
+
+  return value;
+};
+
+/** Schema maps timestamptz → number (ms); mysql2 returns Date. */
+export const isTimestampishColumnName = (camelKey: string): boolean =>
+  camelKey === 'date' || camelKey.endsWith('At');
+
+export const coerceTimestampishValue = (camelKey: string, value: unknown): unknown => {
+  if (value instanceof Date && isTimestampishColumnName(camelKey)) {
+    return value.getTime();
   }
 
   return value;
@@ -113,7 +139,11 @@ export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
       .replaceAll('array[]::varchar[]', 'JSON_ARRAY()')
       .replaceAll('::jsonb', '')
       .replaceAll('::varchar[]', '')
+      .replaceAll('::double precision', '')
       .replaceAll('::int', '')
+      .replace(/\bjson_build_object\b/gi, 'JSON_OBJECT')
+      .replace(/\bjsonb_array_length\s*\(/gi, 'JSON_LENGTH(')
+      .replace(/\bjson_array_length\s*\(/gi, 'JSON_LENGTH(')
       .replace(/\bon conflict do nothing\b/gi, 'ON DUPLICATE KEY UPDATE tenant_id = tenant_id')
       .replace(
         /\bon conflict\s*\([^)]*\)\s*do update set\s+([\s\S]*?)(?=$|;)/gi,
@@ -130,7 +160,13 @@ export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
         /\bcoalesce\(([^,]+),\s*'\{\}'::jsonb\)\s*\|\|/gi,
         'JSON_MERGE_PATCH(COALESCE($1, JSON_OBJECT()),'
       )
-      .replace(/\bto_timestamp\(([^)]+)\s*\/\s*1000\)/gi, 'FROM_UNIXTIME($1 / 1000)')
+      // Prefer millis form first, then any remaining to_timestamp(...)
+      .replace(/\bto_timestamp\(([^)]+)\s*\/\s*1000\)/gi, (_match, expr: string) => {
+        return `FROM_UNIXTIME(${expr.trim()} / 1000)`;
+      })
+      .replace(/\bto_timestamp\(([^)]+)\)/gi, (_match, expr: string) => {
+        return `FROM_UNIXTIME(${expr.trim()})`;
+      })
       // Postgres regex: ~ (case-sensitive) / ~* (case-insensitive)
       .replace(/\s+~\*\s+/g, ' REGEXP ')
       .replace(/\s+~\s+/g, ' REGEXP BINARY ')
@@ -139,6 +175,12 @@ export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
         /((?:`[^`]+`|"[^"]+"|[a-zA-Z_][\w.]*)\s*)\?\s*'((?:\\'|[^'])*)'/g,
         (_match, column: string, key: string) =>
           `JSON_CONTAINS_PATH(${column.trim()}, 'one', '$.${key}')`
+      )
+      // jsonb text extract: column->>'key'
+      .replace(
+        /((?:`[^`]+`|"[^"]+"|[a-zA-Z_][\w.]*)\s*)->>\s*'((?:\\'|[^'])*)'/g,
+        (_match, column: string, key: string) =>
+          `JSON_UNQUOTE(JSON_EXTRACT(${column.trim()}, '$.${key}'))`
       )
   );
 
@@ -173,8 +215,12 @@ const normalizeMariaRows = <R extends Record<string, unknown>>(rows: R[]): R[] =
       Object.fromEntries(
         Object.entries(row).map(([key, value]) => {
           const camelKey = camelCaseColumnName(key);
+          const normalized = coerceTimestampishValue(
+            camelKey,
+            coerceBooleanishValue(camelKey, normalizeJsonValue(value))
+          );
 
-          return [camelKey, coerceBooleanishValue(camelKey, normalizeJsonValue(value))];
+          return [camelKey, normalized];
         })
       ) as R
   );

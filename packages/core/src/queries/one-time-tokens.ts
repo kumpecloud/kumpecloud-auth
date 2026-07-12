@@ -4,6 +4,7 @@ import { sql } from '@silverhand/slonik';
 
 import { buildDeleteByIdWithPool } from '#src/database/delete-by-id.js';
 import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
+import { updateThenSelect } from '#src/database/returning.js';
 import { getTotalRowCountWithPool } from '#src/database/row-count.js';
 import RequestError from '#src/errors/RequestError/index.js';
 import assertThat from '#src/utils/assert-that.js';
@@ -66,12 +67,18 @@ export const createOneTimeTokenQueries = (pool: CommonQueryMethods) => {
     `);
 
   const updateOneTimeTokenStatus = async (token: string, status: OneTimeTokenStatus) =>
-    pool.one<OneTimeToken>(sql`
-      update ${table}
-      set ${fields.status} = ${status}
-      where ${fields.token} = ${token}
-      returning *
-    `);
+    updateThenSelect<OneTimeToken>(pool, {
+      updateSql: sql`
+        update ${table}
+        set ${fields.status} = ${status}
+        where ${fields.token} = ${token}
+        returning *
+      `,
+      selectSql: sql`
+        select * from ${table}
+        where ${fields.token} = ${token}
+      `,
+    });
 
   return {
     deleteOneTimeTokenById,

@@ -24,6 +24,7 @@ import {
   Users,
   OrganizationJitRoles,
 } from '@logto/schemas';
+import { buildInArrayCondition, DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { sql, type CommonQueryMethods } from '@silverhand/slonik';
 
 import { type SearchOptions, buildSearchSql } from '#src/database/utils.js';
@@ -41,6 +42,7 @@ import {
   normalizeOrganizationRole,
   normalizeOrganizationRoleWithScopes,
 } from './role-utils.js';
+import { aggregateNonNullIds } from './utils.js';
 
 /**
  * The schema field keys that can be used for searching roles.
@@ -52,6 +54,8 @@ class OrganizationRolesQueries extends SchemaQueries<
   CreateOrganizationRole,
   OrganizationRole
 > {
+  readonly #dialect = getDatabaseDialectFromEnv();
+
   override async findById(id: string): Promise<Readonly<OrganizationRoleWithScopes>> {
     const role = await this.pool.one(this.#findWithScopesSql(id));
     return normalizeOrganizationRoleWithScopes(role);
@@ -131,7 +135,7 @@ class OrganizationRolesQueries extends SchemaQueries<
     const roles = await this.pool.any<OrganizationRole>(sql`
       select ${table}.*
       from ${table}
-      where ${fields.name} = any(${sql.array(names, 'text')})  
+      where ${buildInArrayCondition(fields.name, names, this.#dialect)}
     `);
 
     return roles.map((role) => normalizeOrganizationRole(role));
@@ -153,33 +157,102 @@ class OrganizationRolesQueries extends SchemaQueries<
     const resourceScopes = convertToIdentifiers(Scopes, true);
     const resource = convertToIdentifiers(Resources, true);
 
+    const scopesAgg =
+      this.#dialect === DatabaseDialect.MariaDB
+        ? sql`
+            coalesce((
+              select JSON_ARRAYAGG(
+                JSON_OBJECT(
+                  'id', ${scopes.fields.id},
+                  'name', ${scopes.fields.name},
+                  'order', ${scopes.fields.id}
+                )
+                ORDER BY ${scopes.fields.id}
+              )
+              from ${relations.table}
+              join ${scopes.table}
+                on ${relations.fields.organizationScopeId} = ${scopes.fields.id}
+              where ${relations.fields.organizationRoleId} = ${fields.id}
+            ), JSON_ARRAY()) as scopes
+          `
+        : sql`
+            coalesce(
+              json_agg(distinct
+                jsonb_build_object(
+                  'id', ${scopes.fields.id},
+                  'name', ${scopes.fields.name},
+                  'order', ${scopes.fields.id}
+                )
+              ) filter (where ${scopes.fields.id} is not null),
+              '[]'
+            ) as scopes
+          `;
+
+    const resourceScopesAgg =
+      this.#dialect === DatabaseDialect.MariaDB
+        ? sql`
+            coalesce((
+              select JSON_ARRAYAGG(
+                JSON_OBJECT(
+                  'id', ${resourceScopes.fields.id},
+                  'name', ${resourceScopes.fields.name},
+                  'resource', JSON_OBJECT(
+                    'id', ${resource.fields.id},
+                    'name', ${resource.fields.name}
+                  ),
+                  'order', ${resourceScopes.fields.id}
+                )
+                ORDER BY ${resourceScopes.fields.id}
+              )
+              from ${resourceScopeRelations.table}
+              join ${resourceScopes.table}
+                on ${resourceScopeRelations.fields.scopeId} = ${resourceScopes.fields.id}
+              join ${resource.table}
+                on ${resourceScopes.fields.resourceId} = ${resource.fields.id}
+              where ${resourceScopeRelations.fields.organizationRoleId} = ${fields.id}
+            ), JSON_ARRAY()) as ${sql.identifier(['resourceScopes'])}
+          `
+        : sql`
+            coalesce(
+              json_agg(distinct
+                jsonb_build_object(
+                  'id', ${resourceScopes.fields.id},
+                  'name', ${resourceScopes.fields.name},
+                  'resource', json_build_object(
+                    'id', ${resource.fields.id},
+                    'name', ${resource.fields.name}
+                  ),
+                  'order', ${resourceScopes.fields.id}
+                )
+              ) filter (where ${resourceScopes.fields.id} is not null),
+              '[]'
+            ) as "resourceScopes"
+          `;
+
+    if (this.#dialect === DatabaseDialect.MariaDB) {
+      return sql<OrganizationRoleWithScopes>`
+        select
+          ${table}.*,
+          ${scopesAgg},
+          ${resourceScopesAgg}
+        from ${table}
+        ${conditionalSql(roleId, (id) => {
+          return sql`where ${fields.id} = ${id}`;
+        })}
+        ${buildSearchSql(OrganizationRoles, search)}
+        ${conditionalSql(this.orderBy, ({ field, order }) => {
+          return sql`order by ${fields[field]} ${order === 'desc' ? sql`desc` : sql`asc`}`;
+        })}
+        limit ${limit}
+        offset ${offset}
+      `;
+    }
+
     return sql<OrganizationRoleWithScopes>`
       select
         ${table}.*,
-        coalesce(
-          json_agg(distinct
-            jsonb_build_object(
-              'id', ${scopes.fields.id},
-              'name', ${scopes.fields.name},
-              'order', ${scopes.fields.id}
-            )
-          ) filter (where ${scopes.fields.id} is not null),
-          '[]'
-        ) as scopes, -- left join could produce nulls as scopes
-        coalesce(
-          json_agg(distinct
-            jsonb_build_object(
-              'id', ${resourceScopes.fields.id},
-              'name', ${resourceScopes.fields.name},
-              'resource', json_build_object(
-                'id', ${resource.fields.id},
-                'name', ${resource.fields.name}
-              ),
-              'order', ${resourceScopes.fields.id}
-            )
-          ) filter (where ${resourceScopes.fields.id} is not null),
-          '[]'
-        ) as "resourceScopes" -- left join could produce nulls as resourceScopes
+        ${scopesAgg},
+        ${resourceScopesAgg}
       from ${table}
       left join ${relations.table}
         on ${relations.fields.organizationRoleId} = ${fields.id}
@@ -217,6 +290,8 @@ class OrganizationInvitationsQueries extends SchemaQueries<
   CreateOrganizationInvitation,
   OrganizationInvitation
 > {
+  readonly #dialect = getDatabaseDialectFromEnv();
+
   override async findById(invitationId: string): Promise<Readonly<OrganizationInvitationEntity>> {
     return this.pool.one(this.#findEntity({ invitationId }));
   }
@@ -262,6 +337,70 @@ class OrganizationInvitationsQueries extends SchemaQueries<
     const roleRelations = convertToIdentifiers(OrganizationInvitationRoleRelations, true);
     const roles = convertToIdentifiers(OrganizationRoles, true);
 
+    const organizationRolesAgg =
+      this.#dialect === DatabaseDialect.MariaDB
+        ? sql`
+            coalesce((
+              select JSON_ARRAYAGG(
+                JSON_OBJECT(
+                  'id', ${roles.fields.id},
+                  'name', ${roles.fields.name}
+                )
+                ORDER BY ${roles.fields.name}
+              )
+              from ${roleRelations.table}
+              join ${roles.table}
+                on ${roles.fields.id} = ${roleRelations.fields.organizationRoleId}
+              where ${roleRelations.fields.organizationInvitationId} = ${fields.id}
+            ), JSON_ARRAY()) as ${sql.identifier(['organizationRoles'])}
+          `
+        : sql`
+            coalesce(
+              json_agg(
+                json_build_object(
+                  'id', ${roles.fields.id},
+                  'name', ${roles.fields.name}
+                ) order by ${roles.fields.name}
+              ) filter (where ${roles.fields.id} is not null),
+              '[]'
+            ) as "organizationRoles"
+          `;
+
+    if (this.#dialect === DatabaseDialect.MariaDB) {
+      return sql<OrganizationInvitationEntity>`
+        select
+          ${sql.join(
+            Object.values(fields).filter((field) => field !== fields.status),
+            sql`, `
+          )},
+          case
+            when
+              ${fields.status} = ${OrganizationInvitationStatus.Pending} and
+              ${fields.expiresAt} < now()
+            then ${OrganizationInvitationStatus.Expired}
+            else ${fields.status}
+          end as ${sql.identifier(['status'])},
+          ${organizationRolesAgg}
+        from ${table}
+        where true
+        ${conditionalSql(invitationId, (id) => {
+          return sql`and ${fields.id} = ${id}`;
+        })}
+        ${conditionalSql(organizationId, (id) => {
+          return sql`and ${fields.organizationId} = ${id}`;
+        })}
+        ${conditionalSql(inviterId, (id) => {
+          return sql`and ${fields.inviterId} = ${id}`;
+        })}
+        ${conditionalSql(invitee, (email) => {
+          return sql`and lower(${fields.invitee}) = lower(${email})`;
+        })}
+        ${conditionalSql(this.orderBy, ({ field, order }) => {
+          return sql`order by ${fields[field]} ${order === 'desc' ? sql`desc` : sql`asc`}`;
+        })}
+      `;
+    }
+
     return sql<OrganizationInvitationEntity>`
       select
         ${sql.join(
@@ -277,15 +416,7 @@ class OrganizationInvitationsQueries extends SchemaQueries<
           then ${OrganizationInvitationStatus.Expired}
           else ${fields.status}
         end as "status",
-        coalesce(
-          json_agg(
-            json_build_object(
-              'id', ${roles.fields.id},
-              'name', ${roles.fields.name}
-            ) order by ${roles.fields.name}
-          ) filter (where ${roles.fields.id} is not null),
-          '[]'
-        ) as "organizationRoles" -- left join could produce nulls
+        ${organizationRolesAgg}
       from ${table}
       left join ${roleRelations.table}
         on ${roleRelations.fields.organizationInvitationId} = ${fields.id}
@@ -317,6 +448,8 @@ export default class OrganizationQueries extends SchemaQueries<
   CreateOrganization,
   Organization
 > {
+  readonly #dialect = getDatabaseDialectFromEnv();
+
   /**
    * Queries for roles in the organization template.
    * @see {@link OrganizationRoles}
@@ -413,7 +546,11 @@ export default class OrganizationQueries extends SchemaQueries<
         exists (
           select 1 from ${users.table} 
             where ${users.fields.id} = ${userId}
-            and jsonb_array_length(${users.fields.mfaVerifications}) > 0
+            and ${
+              this.#dialect === DatabaseDialect.MariaDB
+                ? sql`JSON_LENGTH(${users.fields.mfaVerifications}) > 0`
+                : sql`jsonb_array_length(${users.fields.mfaVerifications}) > 0`
+            }
         ) as "hasMfaConfigured";
     `);
   }
@@ -429,10 +566,11 @@ export default class OrganizationQueries extends SchemaQueries<
     return this.pool.any<JitOrganization>(sql`
       select
         ${organization.fields.id} as "organizationId",
-        array_remove(
-          array_agg(${organizationJitRoles.fields.organizationRoleId}),
-          null
-        ) as "organizationRoleIds"
+        ${aggregateNonNullIds(
+          organizationJitRoles.fields.organizationRoleId,
+          'organizationRoleIds',
+          this.#dialect
+        )}
       from ${organization.table} left join ${organizationJitRoles.table}
         on ${organization.fields.id} = ${organizationJitRoles.fields.organizationId}
       where ${organization.fields.id} in (${sql.join(organizationIds, sql`, `)})

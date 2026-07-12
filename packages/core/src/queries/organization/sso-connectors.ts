@@ -4,12 +4,14 @@ import {
   Organizations,
   SsoConnectors,
 } from '@logto/schemas';
+import { getDatabaseDialectFromEnv } from '@logto/database';
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import { TwoRelationsQueries } from '#src/utils/RelationQueries.js';
 import { convertToIdentifiers } from '#src/utils/sql.js';
 
 import { type JitOrganization } from './email-domains.js';
+import { aggregateNonNullIds } from './utils.js';
 
 const { table, fields } = convertToIdentifiers(OrganizationJitSsoConnectors);
 
@@ -17,6 +19,8 @@ export class SsoConnectorQueries extends TwoRelationsQueries<
   typeof Organizations,
   typeof SsoConnectors
 > {
+  readonly #dialect = getDatabaseDialectFromEnv();
+
   constructor(pool: CommonQueryMethods) {
     super(pool, OrganizationJitSsoConnectors.table, Organizations, SsoConnectors);
   }
@@ -31,10 +35,11 @@ export class SsoConnectorQueries extends TwoRelationsQueries<
     return this.pool.any<JitOrganization>(sql`
       select
         ${fields.organizationId},
-        array_remove(
-          array_agg(${organizationJitRoles.fields.organizationRoleId}),
-          null
-        ) as "organizationRoleIds"
+        ${aggregateNonNullIds(
+          organizationJitRoles.fields.organizationRoleId,
+          'organizationRoleIds',
+          this.#dialect
+        )}
       from ${table}
       left join ${organizationJitRoles.table}
         on ${fields.organizationId} = ${organizationJitRoles.fields.organizationId}

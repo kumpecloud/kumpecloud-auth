@@ -8,6 +8,7 @@ import { type WellKnownCache } from '#src/caches/well-known.js';
 import { buildFindAllEntitiesWithPool } from '#src/database/find-all-entities.js';
 import { buildFindEntityByIdWithPool } from '#src/database/find-entity-by-id.js';
 import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
+import { updateThenSelectMaybe } from '#src/database/returning.js';
 import { getTotalRowCountWithPool } from '#src/database/row-count.js';
 import { buildUpdateWhereWithPool } from '#src/database/update-where.js';
 import { DeletionError, UpdateError } from '#src/errors/SlonikError/index.js';
@@ -45,12 +46,19 @@ export const createResourceQueries = (pool: CommonQueryMethods, wellKnownCache: 
           set ${fields.isDefault}=false
           where ${fields.isDefault}=true;
       `);
-      const returning = await connection.maybeOne<Resource>(sql`
-        update ${table}
-          set ${fields.isDefault}=true
+      const returning = await updateThenSelectMaybe<Resource>(connection, {
+        updateSql: sql`
+          update ${table}
+            set ${fields.isDefault}=true
+            where ${fields.id}=${id}
+            returning *;
+        `,
+        selectSql: sql`
+          select ${sql.join(Object.values(fields), sql`, `)}
+          from ${table}
           where ${fields.id}=${id}
-          returning *;
-      `);
+        `,
+      });
 
       if (!returning) {
         throw new UpdateError(Resources, { set: { isDefault: true }, where: { id } });

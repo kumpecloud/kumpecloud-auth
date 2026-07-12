@@ -5,6 +5,7 @@ import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
 import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
+import { updateThenSelect } from '#src/database/returning.js';
 import { DeletionError } from '#src/errors/SlonikError/index.js';
 import { conditionalSql, convertToIdentifiers } from '#src/utils/sql.js';
 
@@ -59,20 +60,34 @@ export const createPasscodeQueries = (pool: CommonQueryMethods) => {
   });
 
   const consumePasscode = async (id: string) =>
-    pool.query<Passcode>(sql`
-      update ${table}
-      set ${fields.consumed}=true
-      where ${fields.id}=${id}
-      returning ${sql.join(Object.values(fields), sql`, `)}
-    `);
+    updateThenSelect<Passcode>(pool, {
+      updateSql: sql`
+        update ${table}
+        set ${fields.consumed}=true
+        where ${fields.id}=${id}
+        returning ${sql.join(Object.values(fields), sql`, `)}
+      `,
+      selectSql: sql`
+        select ${sql.join(Object.values(fields), sql`, `)}
+        from ${table}
+        where ${fields.id}=${id}
+      `,
+    });
 
   const increasePasscodeTryCount = async (id: string) =>
-    pool.query<Passcode>(sql`
-      update ${table}
-      set ${fields.tryCount}=${fields.tryCount}+1
-      where ${fields.id}=${id}
-      returning ${sql.join(Object.values(fields), sql`, `)}
-    `);
+    updateThenSelect<Passcode>(pool, {
+      updateSql: sql`
+        update ${table}
+        set ${fields.tryCount}=${fields.tryCount}+1
+        where ${fields.id}=${id}
+        returning ${sql.join(Object.values(fields), sql`, `)}
+      `,
+      selectSql: sql`
+        select ${sql.join(Object.values(fields), sql`, `)}
+        from ${table}
+        where ${fields.id}=${id}
+      `,
+    });
 
   const deletePasscodeById = async (id: string) => {
     const { rowCount } = await pool.query(sql`

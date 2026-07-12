@@ -7,6 +7,7 @@ import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
 import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
+import { updateThenSelect } from '#src/database/returning.js';
 import RequestError from '#src/errors/RequestError/index.js';
 import { DeletionError } from '#src/errors/SlonikError/index.js';
 import { convertToIdentifiers, type OmitAutoSetFields } from '#src/utils/sql.js';
@@ -43,14 +44,19 @@ export const createSamlApplicationSecretsQueries = (pool: CommonQueryMethods) =>
       `);
 
       // Update the status of the specified secret
-      const updatedSecret = await transaction.one<SamlApplicationSecret>(sql`
-        update ${table}
-        set ${fields.active} = true
-        where ${fields.id} = ${newSecret.id}
-        returning ${sql.join(Object.values(fields), sql`, `)}
-      `);
-
-      return updatedSecret;
+      return updateThenSelect<SamlApplicationSecret>(transaction, {
+        updateSql: sql`
+          update ${table}
+          set ${fields.active} = true
+          where ${fields.id} = ${newSecret.id}
+          returning ${sql.join(Object.values(fields), sql`, `)}
+        `,
+        selectSql: sql`
+          select ${sql.join(Object.values(fields), sql`, `)}
+          from ${table}
+          where ${fields.id} = ${newSecret.id}
+        `,
+      });
     });
   };
 
@@ -111,14 +117,19 @@ export const createSamlApplicationSecretsQueries = (pool: CommonQueryMethods) =>
       }
 
       // Update the status of the specified secret
-      const updatedSecret = await transaction.one<SamlApplicationSecret>(sql`
-        update ${table}
-        set ${fields.active} = ${active}
-        where ${fields.id} = ${secretId} and ${fields.applicationId} = ${applicationId}
-        returning ${sql.join(Object.values(fields), sql`, `)}
-      `);
-
-      return updatedSecret;
+      return updateThenSelect<SamlApplicationSecret>(transaction, {
+        updateSql: sql`
+          update ${table}
+          set ${fields.active} = ${active}
+          where ${fields.id} = ${secretId} and ${fields.applicationId} = ${applicationId}
+          returning ${sql.join(Object.values(fields), sql`, `)}
+        `,
+        selectSql: sql`
+          select ${sql.join(Object.values(fields), sql`, `)}
+          from ${table}
+          where ${fields.id} = ${secretId} and ${fields.applicationId} = ${applicationId}
+        `,
+      });
     });
   };
 

@@ -4,6 +4,7 @@ import {
   type CreateOrganizationJitEmailDomain,
   OrganizationJitRoles,
 } from '@logto/schemas';
+import { getDatabaseDialectFromEnv } from '@logto/database';
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
@@ -11,9 +12,12 @@ import { DeletionError } from '#src/errors/SlonikError/index.js';
 import { type GetEntitiesOptions } from '#src/utils/RelationQueries.js';
 import { type OmitAutoSetFields, conditionalSql, convertToIdentifiers } from '#src/utils/sql.js';
 
+import { aggregateNonNullIds } from './utils.js';
+
 const { table, fields } = convertToIdentifiers(OrganizationJitEmailDomains);
 
 export class EmailDomainQueries {
+  readonly #dialect = getDatabaseDialectFromEnv();
   readonly #insert: (
     data: OmitAutoSetFields<CreateOrganizationJitEmailDomain>
   ) => Promise<Readonly<OrganizationJitEmailDomain>>;
@@ -73,10 +77,11 @@ export class EmailDomainQueries {
     return this.pool.any<JitOrganization>(sql`
       select
         ${fields.organizationId},
-        array_remove(
-          array_agg(${organizationJitRoles.fields.organizationRoleId}),
-          null
-        ) as "organizationRoleIds"
+        ${aggregateNonNullIds(
+          organizationJitRoles.fields.organizationRoleId,
+          'organizationRoleIds',
+          this.#dialect
+        )}
       from ${table}
       left join ${organizationJitRoles.table}
         on ${fields.organizationId} = ${organizationJitRoles.fields.organizationId}

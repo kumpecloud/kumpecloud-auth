@@ -8,6 +8,7 @@ import {
   type ApplicationWithOrganizationRoles,
   type OrganizationWithRoles,
 } from '@logto/schemas';
+import { buildInArrayCondition, getDatabaseDialectFromEnv } from '@logto/database';
 import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 
 import { type SearchOptions, buildSearchSql } from '#src/database/utils.js';
@@ -22,6 +23,8 @@ export class ApplicationRelationQueries extends TwoRelationsQueries<
   typeof Organizations,
   typeof Applications
 > {
+  readonly #dialect = getDatabaseDialectFromEnv();
+
   constructor(pool: CommonQueryMethods) {
     super(pool, OrganizationApplicationRelations.table, Organizations, Applications);
   }
@@ -45,7 +48,7 @@ export class ApplicationRelationQueries extends TwoRelationsQueries<
       select ${fields.applicationId}
       from ${this.table}
       where ${fields.organizationId} = ${organizationId}
-        and ${fields.applicationId} = any(${sql.array(applicationIds, 'varchar')})
+        and ${buildInArrayCondition(fields.applicationId, applicationIds, this.#dialect)}
     `);
 
     return rows.map((row) => row.applicationId);
@@ -71,7 +74,7 @@ export class ApplicationRelationQueries extends TwoRelationsQueries<
       this.pool.any<OrganizationWithRoles>(sql`
         select
           ${sql.join(Object.values(organizations.fields), sql`, `)},
-          ${aggregateRoles()}
+          ${aggregateRoles('organizationRoles', this.#dialect)}
         from ${this.table}
         left join ${organizations.table}
           on ${fields.organizationId} = ${organizations.fields.id}
@@ -112,7 +115,7 @@ export class ApplicationRelationQueries extends TwoRelationsQueries<
       this.pool.any<ApplicationWithOrganizationRoles>(sql`
         select
           ${sql.join(Object.values(applications.fields), sql`, `)},
-          ${aggregateRoles()}
+          ${aggregateRoles('organizationRoles', this.#dialect)}
         from ${this.table}
         left join ${applications.table}
           on ${fields.applicationId} = ${applications.fields.id}

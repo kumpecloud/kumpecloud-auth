@@ -1,4 +1,9 @@
-import { buildAMemberCustomData, buildAMemberUserProfile, type AMemberCustomData, wasRecentlyPushedToAMember } from './profile-fields.js';
+import {
+  buildAMemberCustomData,
+  buildAMemberUserProfile,
+  type AMemberCustomData,
+  wasRecentlyPushedToAMember,
+} from './profile-fields.js';
 import { buildProductRoleName, isProductRoleName } from './constants.js';
 import type { AMemberSyncContext, LogtoUserRecord } from './context.js';
 import {
@@ -10,16 +15,20 @@ import {
   resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from './utils.js';
-import { RoleType, UsersPasswordEncryptionMethod, type Role } from '@logto/schemas';
+import { RoleType, type Role } from '@logto/schemas';
 import { generateStandardId, generateStandardShortId } from '@logto/shared';
+import {
+  buildJsonCoalesceMerge,
+  buildJsonHasKey,
+  buildOnConflictDoNothing,
+  buildUnixTimestampFromMillis,
+  getDatabaseDialectFromEnv,
+  getQueryDialectFromUrl,
+} from '@logto/database';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
 
 const convertToTable = (table: string) => sql.identifier([table]);
-
-/** Postgres `timestamptz` from JS epoch milliseconds (matches core `convertToPrimitiveOrSql`). */
-const toTimestampFromMs = (milliseconds: number) =>
-  sql`to_timestamp(${milliseconds}::double precision / 1000)`;
 
 export const createSlonikAMemberSyncContext = (
   pool: CommonQueryMethods,
@@ -29,6 +38,13 @@ export const createSlonikAMemberSyncContext = (
   const rolesTable = convertToTable('roles');
   const usersTable = convertToTable('users');
   const usersRolesTable = convertToTable('users_roles');
+  const dialect = getDatabaseDialectFromEnv();
+  const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
+  const regexOperator = queryDialect.buildRegexOperator(true);
+  const customDataColumn = sql.identifier(['custom_data']);
+  const onConflictDoNothing = buildOnConflictDoNothing(dialect);
+  const toTimestampFromMs = (milliseconds: number) =>
+    buildUnixTimestampFromMillis(milliseconds, dialect);
 
   const findAMemberRoles = async () =>
     pool.any<Role>(sql`
@@ -36,7 +52,7 @@ export const createSlonikAMemberSyncContext = (
       from ${rolesTable}
       where tenant_id = ${tenantId}
         and (
-          name ~ ${'^[0-9]+:'}
+          name ${regexOperator} ${'^[0-9]+:'}
           or name like ${'aMember: %'}
         )
     `);
@@ -55,7 +71,7 @@ export const createSlonikAMemberSyncContext = (
         and (
           primary_email is not null
           or username is not null
-          or custom_data ? 'amember'
+          or ${buildJsonHasKey(customDataColumn, 'amember', dialect)}
         )
     `);
 
@@ -103,7 +119,7 @@ export const createSlonikAMemberSyncContext = (
         ),
         sql`, `
       )}
-      on conflict do nothing
+      ${onConflictDoNothing}
     `);
   };
 
@@ -237,6 +253,11 @@ export const createSlonikAMemberSyncContext = (
       const phoneUpdate = buildAMemberPhoneUpdate(user);
       const suspensionUpdate = buildAMemberSuspensionUpdate(user);
       const shouldUpdateSuspension = suspensionUpdate.isSuspended !== undefined;
+      const mergedCustomData = buildJsonCoalesceMerge(
+        customDataColumn,
+        sql.jsonb(buildAMemberCustomData(user, (existing?.customData ?? {}) as AMemberCustomData)),
+        dialect
+      );
 
       await pool.query(sql`
         update ${usersTable}
@@ -253,9 +274,7 @@ export const createSlonikAMemberSyncContext = (
             when ${shouldUpdateSuspension} then ${suspensionUpdate.isSuspended ?? false}
             else is_suspended
           end,
-          custom_data = coalesce(custom_data, '{}'::jsonb) || ${sql.jsonb(
-            buildAMemberCustomData(user, (existing?.customData ?? {}) as AMemberCustomData)
-          )},
+          custom_data = ${mergedCustomData},
           password_encrypted = case
             when ${shouldUpdatePassword} then ${importedPassword?.passwordEncrypted ?? null}
             else password_encrypted
@@ -301,7 +320,7 @@ export const createSlonikAMemberSyncContext = (
           await pool.query(sql`
             insert into ${usersRolesTable} (tenant_id, id, user_id, role_id)
             values (${tenantId}, ${generateStandardId()}, ${userId}, ${roleId})
-            on conflict do nothing
+            ${onConflictDoNothing}
           `);
           added += 1;
         }

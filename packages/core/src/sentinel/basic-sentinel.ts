@@ -10,6 +10,7 @@ import {
   defaultSentinelPolicy,
 } from '@logto/schemas';
 import { generateStandardId } from '@logto/shared';
+import { buildInArrayCondition, DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
 import { type Nullable } from '@silverhand/essentials';
 import { sql, type CommonQueryMethods } from '@silverhand/slonik';
 import { addMinutes } from 'date-fns';
@@ -44,24 +45,21 @@ export default class BasicSentinel extends Sentinel {
     ...BasicSentinel.isolatedActions,
   ] as const);
 
-  /** The array of pooled actions in SQL format. */
-  static pooledActionArray = sql.array(BasicSentinel.pooledActions, 'varchar');
-
   static pooledActionSet = new Set<SentinelActivityAction>(BasicSentinel.pooledActions);
 
-  /** The arrays of isolated actions in SQL format. */
-  static isolatedActionArrays = new Map<SentinelActivityAction, ReturnType<typeof sql.array>>(
-    BasicSentinel.isolatedActions.map((action) => [action, sql.array([action], 'varchar')])
-  );
-
-  static getActionArray(action: SentinelActivityAction) {
+  static getActionValues(action: SentinelActivityAction): readonly string[] {
     const isPooledAction = BasicSentinel.pooledActionSet.has(action);
 
     if (isPooledAction) {
-      return BasicSentinel.pooledActionArray;
+      return BasicSentinel.pooledActions;
     }
 
-    return BasicSentinel.isolatedActionArrays.get(action) ?? sql.array([action], 'varchar');
+    return BasicSentinel.isolatedActions.includes(
+      // eslint-disable-next-line no-restricted-syntax
+      action as (typeof BasicSentinel.isolatedActions)[number]
+    )
+      ? [action]
+      : [action];
   }
 
   /**
@@ -81,6 +79,7 @@ export default class BasicSentinel extends Sentinel {
   }
 
   protected insertActivity = buildInsertIntoWithPool(this.pool)(SentinelActivities);
+  readonly #dialect = getDatabaseDialectFromEnv();
 
   /**
    * Init a basic sentinel with the given pool that has at least the access to the tenant-level
@@ -137,12 +136,12 @@ export default class BasicSentinel extends Sentinel {
   protected async isBlocked(
     query: Pick<SentinelActivity, 'targetType' | 'targetHash' | 'action'>
   ): Promise<Nullable<SentinelDecisionTuple>> {
-    const actionArray = BasicSentinel.getActionArray(query.action);
+    const actionValues = BasicSentinel.getActionValues(query.action);
     const blocked = await this.pool.maybeOne<Pick<SentinelActivity, 'decisionExpiresAt'>>(sql`
       select ${fields.decisionExpiresAt} from ${table}
       where ${fields.targetType} = ${query.targetType}
         and ${fields.targetHash} = ${query.targetHash}
-        and ${fields.action} = any(${actionArray})
+        and ${buildInArrayCondition(fields.action, actionValues, this.#dialect)}
         and ${fields.decision} = ${SentinelDecision.Blocked}
         and ${fields.decisionExpiresAt} > now()
       limit 1
@@ -173,7 +172,7 @@ export default class BasicSentinel extends Sentinel {
       return blocked;
     }
 
-    const actionArray = BasicSentinel.getActionArray(query.action);
+    const actionValues = BasicSentinel.getActionValues(query.action);
     // Postgres returns a bigint for count(*), which Slonik surfaces as a string. Convert it to a
     // number so the threshold arithmetic below is numeric rather than string concatenation.
     const failedAttempts = Number(
@@ -181,10 +180,14 @@ export default class BasicSentinel extends Sentinel {
         select count(*) from ${table}
         where ${fields.targetType} = ${query.targetType}
           and ${fields.targetHash} = ${query.targetHash}
-          and ${fields.action} = any(${actionArray})
+          and ${buildInArrayCondition(fields.action, actionValues, this.#dialect)}
           and ${fields.actionResult} = ${SentinelActionResult.Failed}
           and ${fields.decision} != ${SentinelDecision.Blocked}
-          and ${fields.createdAt} > now() - interval '1 hour'
+          and ${fields.createdAt} > ${
+            this.#dialect === DatabaseDialect.MariaDB
+              ? sql`DATE_SUB(NOW(), INTERVAL 1 HOUR)`
+              : sql`now() - interval '1 hour'`
+          }
       `)
     );
 

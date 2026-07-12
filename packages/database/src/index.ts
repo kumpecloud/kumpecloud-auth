@@ -51,8 +51,12 @@ export {
   buildJsonContains,
   buildJsonHasKey,
   buildJsonRemoveKey,
+  buildJsonTextEquals,
+  buildJsonTextExtract,
   buildOnConflictDoNothing,
   buildTimestampFromMillis,
+  buildUnixTimestampFromMillis,
+  buildUnixTimestampFromSeconds,
   getDatabaseDialectFromEnv,
 } from './sql-helpers.js';
 

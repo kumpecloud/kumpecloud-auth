@@ -12,6 +12,7 @@ import SchemaQueries from '#src/utils/SchemaQueries.js';
 
 import { type WellKnownCache } from '../caches/well-known.js';
 import { buildInsertIntoWithPool } from '../database/insert-into.js';
+import { deleteReturningMany } from '../database/returning.js';
 import { expandFields } from '../database/utils.js';
 import {
   conditionalSql,
@@ -144,18 +145,25 @@ export default class EmailTemplatesQueries extends SchemaQueries<
     where: Partial<Pick<EmailTemplate, 'languageTag' | 'templateType'>>
   ): Promise<{ rowCount: number }> {
     const { fields, table } = convertToIdentifiers(EmailTemplates);
+    const whereClause = sql.join(
+      Object.entries(where).map(
+        // eslint-disable-next-line no-restricted-syntax -- Object.entries can not infer the key type properly.
+        ([key, value]) => sql`${fields[key as keyof EmailTemplate]} = ${value}`
+      ),
+      sql` and `
+    );
 
-    const { rows, rowCount } = await this.pool.query<EmailTemplate>(sql`
-      delete from ${table}
-      where ${sql.join(
-        Object.entries(where).map(
-          // eslint-disable-next-line no-restricted-syntax -- Object.entries can not infer the key type properly.
-          ([key, value]) => sql`${fields[key as keyof EmailTemplate]} = ${value}`
-        ),
-        sql` and `
-      )}
-      returning *
-    `);
+    const { rows, rowCount } = await deleteReturningMany<EmailTemplate>(this.pool, {
+      selectBeforeDeleteSql: sql`
+        select * from ${table}
+        where ${whereClause}
+      `,
+      deleteSql: sql`
+        delete from ${table}
+        where ${whereClause}
+        returning *
+      `,
+    });
 
     // Make sure to invalidate the cache after deleting email templates
     void Promise.all(

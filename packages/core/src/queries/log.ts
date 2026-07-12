@@ -5,6 +5,11 @@ import {
   type Log,
   type WebhookLogPrefix,
 } from '@logto/schemas';
+import {
+  buildJsonTextEquals,
+  buildUnixTimestampFromMillis,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 import { conditional, conditionalArray } from '@silverhand/essentials';
 import { sql } from '@silverhand/slonik';
 import type { CommonQueryMethods } from '@silverhand/slonik';
@@ -15,6 +20,7 @@ import { buildInsertIntoWithPool } from '#src/database/insert-into.js';
 import { conditionalSql, convertToIdentifiers } from '#src/utils/sql.js';
 
 const { table, fields } = convertToIdentifiers(Logs);
+const dialect = getDatabaseDialectFromEnv();
 
 type AllowedKeyPrefix = AuditLogPrefix | WebhookLogPrefix;
 
@@ -56,7 +62,7 @@ const buildLogConditionSql = (logCondition: LogCondition) =>
       ...conditionalArray(
         payload &&
           Object.entries(payload).map(([key, value]) =>
-            value ? sql`${fields.payload}->>${key}=${value}` : sql``
+            value ? buildJsonTextEquals(fields.payload, key, value, dialect) : sql``
           )
       ),
       conditionalSql(logKey, (logKey) => sql`${fields.key}=${logKey}`),
@@ -65,10 +71,10 @@ const buildLogConditionSql = (logCondition: LogCondition) =>
       // falsy and would silently drop the filter.
       startTime === undefined
         ? sql``
-        : sql`${fields.createdAt} > to_timestamp(${startTime}::double precision / 1000)`,
+        : sql`${fields.createdAt} > ${buildUnixTimestampFromMillis(startTime, dialect)}`,
       endTime === undefined
         ? sql``
-        : sql`${fields.createdAt} < to_timestamp(${endTime}::double precision / 1000)`,
+        : sql`${fields.createdAt} < ${buildUnixTimestampFromMillis(endTime, dialect)}`,
     ].filter(({ sql }) => sql);
 
     return subConditions.length > 0 ? sql`where ${sql.join(subConditions, sql` and `)}` : sql``;
@@ -121,10 +127,10 @@ export const createLogQueries = (pool: CommonQueryMethods) => {
     const startTimeExclusive = subDays(new Date(), 1).getTime();
     return pool.one<HookExecutionStats>(sql`
       select count(*) as request_count,
-      count(case when ${fields.payload}->>'result' = 'Success' then 1 end) as success_count
+      count(case when ${buildJsonTextEquals(fields.payload, 'result', 'Success', dialect)} then 1 end) as success_count
       from ${table}
-      where ${fields.createdAt} > to_timestamp(${startTimeExclusive}::double precision / 1000)
-      and ${fields.payload}->>'hookId' = ${hookId}
+      where ${fields.createdAt} > ${buildUnixTimestampFromMillis(startTimeExclusive, dialect)}
+      and ${buildJsonTextEquals(fields.payload, 'hookId', hookId, dialect)}
     `);
   };
 

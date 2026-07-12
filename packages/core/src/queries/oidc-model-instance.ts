@@ -1,6 +1,13 @@
 import type { Application, OidcModelInstance, OidcModelInstancePayload } from '@logto/schemas';
 import { Applications, OidcModelInstances } from '@logto/schemas';
-import { buildGrantIdInAuthorizationsExists, getDatabaseDialectFromEnv } from '@logto/database';
+import {
+  buildGrantIdInAuthorizationsExists,
+  buildJsonHasKey,
+  buildJsonTextEquals,
+  buildJsonTextExtract,
+  DatabaseDialect,
+  getDatabaseDialectFromEnv,
+} from '@logto/database';
 import type { Nullable } from '@silverhand/essentials';
 import { conditional } from '@silverhand/essentials';
 import type { CommonQueryMethods, ValueExpression } from '@silverhand/slonik';
@@ -94,10 +101,7 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
     field: 'uid' | 'userCode',
     value: T
   ) => {
-    const condition =
-      field === 'uid'
-        ? sql`${fields.payload}->>'uid'=${value}`
-        : sql`${fields.payload}->>'userCode'=${value}`;
+    const condition = buildJsonTextEquals(fields.payload, field, value, dialect);
 
     // Fetch up to 2 matching records to detect duplicates without loading all of them.
     const results = await pool.any<QueryResult>(sql`
@@ -144,9 +148,10 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
     field: Field,
     value: T
   ) => {
+    const condition = buildJsonTextEquals(fields.payload, String(field), value, dialect);
     const results = await pool.any<QueryResult>(sql`
       ${findByModel(modelName)}
-      and ${fields.payload}->>${field}=${value}
+      and ${condition}
     `);
 
     // Rarely, duplicate UIDs can exist for different sessions.
@@ -157,7 +162,7 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
       await pool.query(sql`
         delete from ${table}
         where ${fields.modelName}=${modelName}
-          and ${fields.payload}->>${field}=${value}
+          and ${condition}
       `);
       return;
     }
@@ -194,8 +199,8 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
           select ${fields.id}
           from ${table}
           where ${fields.modelName}=${modelName}
-          and ${fields.payload} ? 'grantId'
-          and ${fields.payload}->>'grantId'=${grantId}
+          and ${buildJsonHasKey(fields.payload, 'grantId', dialect)}
+          and ${buildJsonTextEquals(fields.payload, 'grantId', grantId, dialect)}
           limit ${revokeInstanceBatchSize}
         )
       `);
@@ -210,7 +215,7 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
     await pool.query(sql`
       delete from ${table}
       where ${fields.modelName}=${modelName}
-      and ${fields.payload}->>'accountId'=${userId}
+      and ${buildJsonTextEquals(fields.payload, 'accountId', userId, dialect)}
     `);
   };
 
@@ -244,18 +249,25 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
       applicationAlias,
       Applications.fields.isThirdParty,
     ]);
+    const applicationObject =
+      dialect === DatabaseDialect.MariaDB
+        ? sql`JSON_OBJECT(
+            'id', ${applicationId},
+            'name', ${applicationName}
+          )`
+        : sql`json_build_object(
+            'id', ${applicationId},
+            'name', ${applicationName}
+          )`;
 
     return pool.any<ActiveApplicationGrantInstance>(sql`
       select ${oidcModelInstanceId}, ${oidcModelInstancePayload}, ${oidcModelInstanceExpiresAt},
-        json_build_object(
-          'id', ${applicationId},
-          'name', ${applicationName}
-        ) as application
+        ${applicationObject} as application
       from ${table} as ${oidcModelInstanceTableIdentifier}
       inner join ${applicationTable} as ${applicationTableIdentifier}
-        on ${oidcModelInstancePayload}->>'clientId'=${applicationId}
+        on ${buildJsonTextEquals(oidcModelInstancePayload, 'clientId', applicationId, dialect)}
       where ${oidcModelInstanceModelName}='Grant'
-        and ${oidcModelInstancePayload}->>'accountId'=${userId}
+        and ${buildJsonTextEquals(oidcModelInstancePayload, 'accountId', userId, dialect)}
         ${
           applicationType
             ? sql`and ${applicationIsThirdParty}=${applicationType === 'thirdParty'}`
@@ -270,8 +282,8 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
       select ${fields.id}, ${fields.payload}, ${fields.expiresAt}
       from ${table}
       where ${fields.modelName}='Grant'
-        and ${fields.payload}->>'accountId'=${userId}
-        and ${fields.payload}->>'clientId'=${clientId}
+        and ${buildJsonTextEquals(fields.payload, 'accountId', userId, dialect)}
+        and ${buildJsonTextEquals(fields.payload, 'clientId', clientId, dialect)}
         and ${fields.expiresAt} > ${convertToTimestamp()}
     `);
   };
@@ -280,10 +292,10 @@ export const createOidcModelInstanceQueries = (pool: CommonQueryMethods) => {
     // A grant is expected to be associated with at most one active session authorization entry.
     // Limit to one row for targeted cleanup without scanning all sessions.
     return pool.maybeOne<{ sessionUid: string }>(sql`
-      select ${fields.payload} ->> 'uid' as "sessionUid"
+      select ${buildJsonTextExtract(fields.payload, 'uid', dialect)} as "sessionUid"
       from ${table}
       where ${fields.modelName} = ${sessionModelName}
-        and ${fields.payload} ->> 'accountId' = ${accountId}
+        and ${buildJsonTextEquals(fields.payload, 'accountId', accountId, dialect)}
         and ${fields.expiresAt} > ${convertToTimestamp()}
         and ${buildGrantIdInAuthorizationsExists(fields.payload, grantId, dialect)}
       limit 1
