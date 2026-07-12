@@ -216,12 +216,17 @@ export const transformRowForMariaInsert = (row: Record<string, unknown>) => {
   return transformed;
 };
 
-const normalizeRows = (rows: ReadonlyArray<Record<string, unknown>>) =>
+const normalizeRows = (
+  rows: ReadonlyArray<Record<string, unknown>>,
+  columns?: readonly string[]
+) =>
   rows
     .map((row) => {
       const normalized = transformRow(row);
+      const keys = columns ?? Object.keys(normalized).sort();
+      const filtered = Object.fromEntries(keys.map((key) => [key, normalized[key] ?? null]));
 
-      return JSON.stringify(normalized, Object.keys(normalized).sort());
+      return JSON.stringify(filtered, [...keys]);
     })
     .sort();
 
@@ -237,8 +242,10 @@ const checksumNormalizedRows = (normalizedRows: readonly string[]) => {
   return hash.toString(16);
 };
 
-export const checksumRows = (rows: ReadonlyArray<Record<string, unknown>>) =>
-  checksumNormalizedRows(normalizeRows(rows));
+export const checksumRows = (
+  rows: ReadonlyArray<Record<string, unknown>>,
+  columns?: readonly string[]
+) => checksumNormalizedRows(normalizeRows(rows, columns));
 
 export const filterMigrationPlan = (plan: TableMigrationPlan[], options: MigrationOptions) => {
   let filtered = plan.filter(({ table }) => (options.tables ? options.tables.includes(table) : true));
@@ -263,7 +270,8 @@ export const computePaginatedTableChecksum = async (
   pool: PostgresDatabasePool | MariaDatabasePool,
   table: string,
   dialect: DatabaseDialect,
-  pageSize: number
+  pageSize: number,
+  columns?: readonly string[]
 ) => {
   const normalizedRows: string[] = [];
   let offset = 0;
@@ -289,7 +297,7 @@ export const computePaginatedTableChecksum = async (
       break;
     }
 
-    normalizedRows.push(...normalizeRows(rows));
+    normalizedRows.push(...normalizeRows(rows, columns));
     offset += pageSize;
   }
 
@@ -380,17 +388,26 @@ export class MigrationService {
       const existingTargetCount = Number(existingRows[0]?.count ?? 0);
 
       if (options.skipExisting && existingTargetCount > 0) {
+        const sourceSample = await postgresSource.query<Record<string, unknown>>(sql`
+          select * from ${sql.identifier([table])} limit 1
+        `);
+        const sourceColumns =
+          sourceSample.rows[0] === undefined
+            ? undefined
+            : Object.keys(transformRow(sourceSample.rows[0])).sort();
         const sourceChecksum = await computePaginatedTableChecksum(
           postgresSource,
           table,
           DatabaseDialect.Postgres,
-          pageSize
+          pageSize,
+          sourceColumns
         );
         const targetChecksum = await computePaginatedTableChecksum(
           mariaTarget,
           table,
           DatabaseDialect.MariaDB,
-          pageSize
+          pageSize,
+          sourceColumns
         );
 
         if (
@@ -435,6 +452,8 @@ export class MigrationService {
       }
 
       const columns = Object.keys(transformRowForMariaInsert(rows[0]!));
+      // Compare only physical source columns — MariaDB virtual/generated columns must not affect checksums.
+      const sourceColumns = Object.keys(transformRow(rows[0]!)).sort();
 
       for (let index = 0; index < rows.length; index += pageSize) {
         const batch = rows.slice(index, index + pageSize).map(transformRowForMariaInsert);
@@ -451,12 +470,13 @@ export class MigrationService {
         );
       }
 
-      const sourceChecksum = checksumRows(rows);
+      const sourceChecksum = checksumRows(rows, sourceColumns);
       const targetVerification = await computePaginatedTableChecksum(
         mariaTarget,
         table,
         DatabaseDialect.MariaDB,
-        pageSize
+        pageSize,
+        sourceColumns
       );
 
       const verification: MigrationVerification = {

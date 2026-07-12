@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { checksumRows, filterMigrationPlan, getTableMigrationPlan } from './migrate-pg-to-mariadb.js';
+import { checksumRows, filterMigrationPlan, getTableMigrationPlan, transformRow } from './migrate-pg-to-mariadb.js';
 
 describe('getTableMigrationPlan', () => {
   it('returns tables in init_order sequence', async () => {
@@ -63,10 +63,14 @@ describe('checksumRows', () => {
         is_third_party: 0,
         created_at: '2026-07-09 00:46:16.154',
         oidc_client_metadata: '{"redirectUris":[],"postLogoutRedirectUris":[]}',
+        // Virtual columns exist only on MariaDB — must not affect checksum when filtered.
+        protected_app_metadata_host: null,
+        protected_app_metadata_custom_domain: null,
       },
     ];
+    const columns = Object.keys(transformRow(postgresShaped[0]!)).sort();
 
-    expect(checksumRows(postgresShaped)).toBe(checksumRows(mariadbShaped));
+    expect(checksumRows(postgresShaped, columns)).toBe(checksumRows(mariadbShaped, columns));
   });
 });
 
