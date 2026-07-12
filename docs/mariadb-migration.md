@@ -53,16 +53,27 @@ MariaDB `TenantGuard` enforces equivalent filtering on tenant-scoped tables.
 ## CLI commands
 
 ```bash
-# Seed (dialect from DB_URL or --dialect mariadb)
+# Seed (dialect from DB_URL)
 pnpm cli db seed
 
 # Deploy MariaDB alterations
-pnpm cli db alteration deploy latest --dialect mariadb
+pnpm cli db alteration deploy latest
 
 # Migrate data Postgres → MariaDB
-pnpm cli db migrate --from "$PG_URL" --to "$MARIADB_URL" --dry-run
-pnpm cli db migrate --from "$PG_URL" --to "$MARIADB_URL" --batch-size 500
+# Defaults: --to from DB_URL (or MIGRATE_TO_URL); --from from MIGRATE_FROM_URL / POSTGRES_URL / POSTGRES_*
+pnpm cli db migrate --dry-run
+pnpm cli db migrate --force --batch-size 500
 ```
+
+In Docker Compose (after `DB_URL` + `MIGRATE_FROM_URL` are set on the auth service):
+
+```bash
+docker compose exec kumpecloud-auth npm run cli -- db migrate --dry-run
+docker compose exec kumpecloud-auth npm run cli -- db migrate --force --batch-size 500
+docker compose restart kumpecloud-auth
+```
+
+For an external MariaDB, point `DB_URL` at it; migrate still uses that as `--to`. For an external Postgres source, set `MIGRATE_FROM_URL` (or `POSTGRES_URL`).
 
 MariaDB alteration state is stored in `systems` under key `mariadbAlterationState` (separate from Postgres `alterationState`).
 
@@ -80,17 +91,17 @@ MariaDB alteration state is stored in `systems` under key `mariadbAlterationStat
 2. `export DB_URL=mariadb://logto:password@mariadb:3306/logto`
 3. `pnpm cli db seed` on empty MariaDB
 4. `pnpm cli db alteration deploy latest --dialect mariadb`
-5. `pnpm cli db migrate --from "$STAGE_PG_URL" --to "$STAGE_MARIADB_URL" --dry-run`
-6. Run migrate without `--dry-run`; verify row counts and checksums in CLI output
+5. `pnpm cli db migrate --dry-run` (or `docker compose exec kumpecloud-auth npm run cli -- db migrate --dry-run`)
+6. Run migrate with `--force`; verify row counts and checksums in CLI output
 7. Point staging `DB_URL` to MariaDB; smoke test OIDC, Console, Experience, aMember sync
 8. Run integration tests: `DB_URL=mariadb://... pnpm test:integration`
 
 ### Production (maintenance window)
 
 1. Enable maintenance mode
-2. `pnpm cli db migrate --from "$PROD_PG_URL" --to "$PROD_MARIADB_URL" --dry-run` — review plan
-3. Run migration; retain CLI verification output
-4. Switch `DB_URL` to MariaDB in deploy compose / env
+2. `pnpm cli db migrate --dry-run` — review plan (URLs from `DB_URL` + `MIGRATE_FROM_URL`)
+3. Run `pnpm cli db migrate --force`; retain CLI verification output
+4. Switch `DB_URL` to MariaDB in deploy compose / env (if not already)
 5. Restart auth services; verify:
    - OIDC discovery + token endpoint
    - Admin Console login

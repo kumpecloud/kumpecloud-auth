@@ -1,13 +1,17 @@
-import { noop } from '@silverhand/essentials';
 import type { CommandModule } from 'yargs';
 
+import { consoleLog } from '../../utils.js';
+
 import { migratePgToMariaDb } from './migrate-pg-to-mariadb.js';
+import { resolveMigrateUrls } from './resolve-migrate-urls.js';
+
+const redactUrl = (url: string) => url.replace(/:([^:@/]+)@/, ':***@');
 
 const migrate: CommandModule<
   unknown,
   {
-    from: string;
-    to: string;
+    from?: string;
+    to?: string;
     dryRun?: boolean;
     batchSize?: number;
     tables?: string;
@@ -18,18 +22,18 @@ const migrate: CommandModule<
   }
 > = {
   command: 'migrate',
-  describe: 'Migrate data from PostgreSQL to MariaDB',
+  describe:
+    'Migrate data from PostgreSQL to MariaDB. Defaults: --to from DB_URL / MIGRATE_TO_URL; --from from MIGRATE_FROM_URL / POSTGRES_URL / POSTGRES_*.',
   builder: (yargs) =>
     yargs
       .option('from', {
-        describe: 'Source PostgreSQL URL',
+        describe:
+          'Source PostgreSQL URL (default: MIGRATE_FROM_URL, POSTGRES_URL, or postgres:// from POSTGRES_*)',
         type: 'string',
-        demandOption: true,
       })
       .option('to', {
-        describe: 'Target MariaDB URL',
+        describe: 'Target MariaDB URL (default: MIGRATE_TO_URL or DB_URL)',
         type: 'string',
-        demandOption: true,
       })
       .option('dry-run', {
         describe: 'Report migration plan without writing',
@@ -74,15 +78,19 @@ const migrate: CommandModule<
     skipExisting,
     force,
   }) => {
+    const { fromUrl, toUrl } = resolveMigrateUrls({ from, to });
     const parseTableList = (value?: string) =>
       value
         ?.split(',')
         .map((table) => table.trim())
         .filter(Boolean);
 
+    consoleLog.info(`Migrate from ${redactUrl(fromUrl)}`);
+    consoleLog.info(`Migrate to   ${redactUrl(toUrl)}`);
+
     await migratePgToMariaDb({
-      fromUrl: from,
-      toUrl: to,
+      fromUrl,
+      toUrl,
       dryRun,
       batchSize,
       tables: parseTableList(tables),

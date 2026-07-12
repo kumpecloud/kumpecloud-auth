@@ -50,8 +50,8 @@ See [docs/mariadb-migration.md](../../../docs/mariadb-migration.md) for Postgres
 
 1. Deploy MariaDB alongside Postgres (see `mariadb` service in stage compose).
 2. Seed + deploy MariaDB alterations: `pnpm cli db alteration deploy latest --dialect mariadb`
-3. Migrate data: `pnpm cli db migrate --from "$PG_URL" --to "$MARIADB_URL" --dry-run`
-4. Switch `DB_URL` to `mariadb://logto:PASSWORD@mariadb:3306/logto`
+3. Migrate data: `pnpm cli db migrate --dry-run` then `pnpm cli db migrate --force` (`--to` from `DB_URL`, `--from` from `MIGRATE_FROM_URL`)
+4. Switch `DB_URL` to `mariadb://…` if not already
 5. Smoke test OIDC + Console; keep Postgres read-only backup
 
 ## Startup entrypoint

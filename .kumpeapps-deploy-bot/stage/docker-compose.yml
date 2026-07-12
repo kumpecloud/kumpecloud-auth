@@ -62,6 +62,9 @@ services:
     environment:
       TRUST_PROXY_HEADER: '1'
       DB_URL: mariadb://logto:${POSTGRES_PASSWORD}@mariadb:3306/logto
+      # Used by `npm run cli -- db migrate` (defaults --from / --to from env).
+      MIGRATE_FROM_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/logto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       ENDPOINT: https://auth.stage.kumpe.app
       ADMIN_ENDPOINT: https://auth-console.stage.kumpe.app
       ALL_YES: '1'
