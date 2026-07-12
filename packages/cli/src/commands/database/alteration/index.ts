@@ -144,11 +144,30 @@ const revertAlterations = async (
   }
 };
 
+export const resolveAlterationDialect = (
+  dialectOption?: string,
+  dialectPositional?: string
+): DatabaseDialect => {
+  const resolved = dialectOption ?? dialectPositional;
+
+  if (resolved === 'mariadb') {
+    return DatabaseDialect.MariaDB;
+  }
+
+  if (resolved === 'postgres') {
+    return DatabaseDialect.Postgres;
+  }
+
+  return getDatabaseDialectFromUrl(process.env.DB_URL ?? '');
+};
+
 const alteration: CommandModule<
   unknown,
-  { action: string; target?: string; dialect?: string }
+  { action: string; target?: string; dialect?: string; dialectPositional?: string }
 > = {
-  command: ['alteration <action> [target]', 'alt', 'alter'],
+  // Optional trailing dialect positional covers `npm run … --dialect mariadb`, where npm
+  // swallows `--dialect` and leaves a bare `mariadb` / `postgres` argument.
+  command: ['alteration <action> [target] [dialectPositional]', 'alt', 'alter'],
   describe: 'Perform database alteration',
   builder: (yargs) =>
     yargs
@@ -165,15 +184,16 @@ const alteration: CommandModule<
       .positional('target', {
         describe: 'The target Logto version for alteration',
         type: 'string',
+      })
+      .positional('dialectPositional', {
+        describe:
+          'Optional dialect (postgres or mariadb). Prefer --dialect or DB_URL; this exists for npm arg-passthrough quirks.',
+        type: 'string',
+        choices: ['postgres', 'mariadb'],
       }),
 
-  handler: async ({ action, target, dialect: dialectArg }) => {
-    const dialect =
-      dialectArg === 'mariadb'
-        ? DatabaseDialect.MariaDB
-        : dialectArg === 'postgres'
-          ? DatabaseDialect.Postgres
-          : getDatabaseDialectFromUrl(process.env.DB_URL ?? '');
+  handler: async ({ action, target, dialect: dialectArg, dialectPositional }) => {
+    const dialect = resolveAlterationDialect(dialectArg, dialectPositional);
 
     switch (action) {
       case 'list': {
