@@ -79,6 +79,22 @@ export const toMariaDbDateTime = (value: Date | number | string): string => {
   return iso.replace('T', ' ').replace(/Z$/i, '');
 };
 
+const canonicalizeJson = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => canonicalizeJson(entry));
+  }
+
+  if (value && typeof value === 'object' && !Buffer.isBuffer(value) && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalizeJson(entry)])
+    );
+  }
+
+  return value;
+};
+
 export const transformValueForMariaDb = (key: string, value: unknown) => {
   if (value instanceof Date) {
     return toMariaDbDateTime(value);
@@ -89,23 +105,101 @@ export const transformValueForMariaDb = (key: string, value: unknown) => {
     return toMariaDbDateTime(value);
   }
 
-  if (isTimestampField(key) && typeof value === 'string' && value.includes('T')) {
-    return toMariaDbDateTime(value);
+  if (isTimestampField(key) && typeof value === 'string' && /T|\s/.test(value)) {
+    const parsed = Date.parse(value);
+
+    if (!Number.isNaN(parsed)) {
+      return toMariaDbDateTime(parsed);
+    }
   }
 
   if (value && typeof value === 'object' && !Buffer.isBuffer(value)) {
-    return JSON.stringify(value);
+    return JSON.stringify(canonicalizeJson(value));
   }
 
   return value;
 };
 
-/** Normalize values for checksums; keep keys stable (camelCase from both pools). */
+/**
+ * Normalize a cell for cross-dialect checksums (Postgres vs MariaDB reads diverge on
+ * bool/int, Date vs string, and JSON key order).
+ */
+export const normalizeValueForChecksum = (key: string, value: unknown): unknown => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+
+  // MariaDB TINYINT(1) / boolean columns come back as 0/1.
+  if (value === 0 || value === 1) {
+    return value;
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return value.toString('hex');
+  }
+
+  if (value instanceof Date) {
+    return toMariaDbDateTime(value);
+  }
+
+  if (isTimestampField(key) && typeof value === 'number' && Number.isFinite(value)) {
+    return toMariaDbDateTime(value);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+
+    if (trimmed === '') {
+      return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      const asIso = trimmed.includes('T')
+        ? trimmed
+        : `${trimmed.replace(' ', 'T')}${/[zZ]|[+-]\d{2}:\d{2}$/.test(trimmed) ? '' : 'Z'}`;
+      const parsed = Date.parse(asIso);
+
+      if (!Number.isNaN(parsed)) {
+        return toMariaDbDateTime(parsed);
+      }
+    }
+
+    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && (trimmed.endsWith('}') || trimmed.endsWith(']'))) {
+      try {
+        return JSON.stringify(canonicalizeJson(JSON.parse(trimmed) as unknown));
+      } catch {
+        return trimmed;
+      }
+    }
+
+    if (trimmed === 'true') {
+      return 1;
+    }
+
+    if (trimmed === 'false') {
+      return 0;
+    }
+
+    return trimmed;
+  }
+
+  if (typeof value === 'object') {
+    return JSON.stringify(canonicalizeJson(value));
+  }
+
+  return value;
+};
+
+/** Normalize values + snake_case keys for stable Postgres↔MariaDB checksums. */
 export const transformRow = (row: Record<string, unknown>) => {
   const transformed: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(row)) {
-    transformed[key] = transformValueForMariaDb(key, value);
+    transformed[toSnakeCaseColumn(key)] = normalizeValueForChecksum(key, value);
   }
 
   return transformed;
@@ -124,7 +218,11 @@ export const transformRowForMariaInsert = (row: Record<string, unknown>) => {
 
 const normalizeRows = (rows: ReadonlyArray<Record<string, unknown>>) =>
   rows
-    .map((row) => JSON.stringify(transformRow(row), Object.keys(transformRow(row)).sort()))
+    .map((row) => {
+      const normalized = transformRow(row);
+
+      return JSON.stringify(normalized, Object.keys(normalized).sort());
+    })
     .sort();
 
 const checksumNormalizedRows = (normalizedRows: readonly string[]) => {
@@ -194,6 +292,9 @@ export const computePaginatedTableChecksum = async (
     normalizedRows.push(...normalizeRows(rows));
     offset += pageSize;
   }
+
+  // Sort across pages so checksum is independent of page boundaries.
+  normalizedRows.sort();
 
   return {
     count: normalizedRows.length,

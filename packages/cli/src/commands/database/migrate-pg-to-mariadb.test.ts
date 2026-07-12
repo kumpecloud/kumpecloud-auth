@@ -47,6 +47,27 @@ describe('checksumRows', () => {
 
     expect(checksumRows(rows)).toBe(checksumRows([...rows].reverse()));
   });
+
+  it('treats dialect-specific bool/date/json shapes as equal', () => {
+    const postgresShaped = [
+      {
+        tenantId: 'admin',
+        isThirdParty: false,
+        createdAt: new Date('2026-07-09T00:46:16.154Z'),
+        oidcClientMetadata: { postLogoutRedirectUris: [], redirectUris: [] },
+      },
+    ];
+    const mariadbShaped = [
+      {
+        tenant_id: 'admin',
+        is_third_party: 0,
+        created_at: '2026-07-09 00:46:16.154',
+        oidc_client_metadata: '{"redirectUris":[],"postLogoutRedirectUris":[]}',
+      },
+    ];
+
+    expect(checksumRows(postgresShaped)).toBe(checksumRows(mariadbShaped));
+  });
 });
 
 describe('transformRowForMariaInsert', () => {
