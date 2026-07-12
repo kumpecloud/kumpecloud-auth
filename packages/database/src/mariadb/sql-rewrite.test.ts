@@ -18,9 +18,16 @@ describe('rewritePostgresSqlForMariaDB', () => {
     );
   });
 
-  it('applies identifier rewrite in the full rewriter', () => {
-    expect(rewritePostgresSqlForMariaDB(`select "id" from "users"`)).toBe(
-      'select `id` from `users`'
+  it('rewrites Postgres regex and jsonb key-existence operators', () => {
+    const withRegex = rewritePostgresSqlForMariaDB(
+      `select * from roles where name ~ '^[0-9]+:' or name ~* 'amember'`
     );
+    expect(withRegex).toContain('REGEXP BINARY');
+    expect(withRegex).toContain('REGEXP');
+    expect(withRegex).not.toMatch(/\s~\s|\s~\*\s/);
+
+    expect(
+      rewritePostgresSqlForMariaDB(`select * from users where custom_data ? 'amember'`)
+    ).toBe(`select * from users where JSON_CONTAINS_PATH(custom_data, 'one', '$.amember')`);
   });
 });

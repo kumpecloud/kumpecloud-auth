@@ -17,6 +17,11 @@ import {
   resolveAMemberUserIdentity,
   truncateRoleDescription,
 } from '@logto/plugin-amember-sync';
+import {
+  buildJsonHasKey,
+  getDatabaseDialectFromEnv,
+  getQueryDialectFromUrl,
+} from '@logto/database';
 import { RoleType, Roles, Users, type Role } from '@logto/schemas';
 import { generateStandardId } from '@logto/shared';
 import { sql } from '@silverhand/slonik';
@@ -40,12 +45,15 @@ export const createAMemberSyncContext = (
     usersRoles: { findUsersRolesByUserId, insertUsersRoles, deleteUsersRolesByUserIdAndRoleId },
   } = queries;
   const { generateUserId, insertUser, signOutUser } = usersLibrary;
+  const dialect = getDatabaseDialectFromEnv();
+  const queryDialect = getQueryDialectFromUrl(process.env.DB_URL ?? '');
+  const regexOperator = queryDialect.buildRegexOperator(true);
 
   const findAMemberRoles = async () =>
     queries.pool.any<Role>(sql`
       select ${sql.join(Object.values(roleFields), sql`, `)}
       from ${rolesTable}
-      where ${roleFields.name} ~ ${'^[0-9]+:'}
+      where ${roleFields.name} ${regexOperator} ${'^[0-9]+:'}
         or ${roleFields.name} like ${'aMember: %'}
     `);
 
@@ -61,7 +69,7 @@ export const createAMemberSyncContext = (
       from ${usersTable}
       where ${userFields.primaryEmail} is not null
         or ${userFields.username} is not null
-        or ${userFields.customData} ? 'amember'
+        or ${buildJsonHasKey(userFields.customData, 'amember', dialect)}
     `);
 
     const byEmail = new Map<string, LogtoUserRecord>();

@@ -78,6 +78,7 @@ describe('createMariaPool', () => {
         {
           oidc_client_metadata: '{"redirectUris":[]}',
           is_third_party: 0,
+          app_level_access_control_enabled: 1,
           tenant_id: 'admin',
         },
       ],
@@ -90,7 +91,8 @@ describe('createMariaPool', () => {
     expect(result.rows).toEqual([
       {
         oidcClientMetadata: { redirectUris: [] },
-        isThirdParty: 0,
+        isThirdParty: false,
+        appLevelAccessControlEnabled: true,
         tenantId: 'admin',
       },
     ]);

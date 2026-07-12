@@ -19,6 +19,19 @@ type QueryInput = SlonikQueryToken | string;
 export const camelCaseColumnName = (name: string): string =>
   name.replaceAll(/_([a-z0-9])/gi, (_, char: string) => String(char).toUpperCase());
 
+/** MariaDB TINYINT(1) comes back as 0/1; coerce common boolean column names to real booleans. */
+export const isBooleanishColumnName = (camelKey: string): boolean =>
+  /^(is|has|was|can|should)[A-Z]/.test(camelKey) ||
+  camelKey.endsWith('Enabled') ||
+  camelKey.endsWith('Disabled');
+
+export const coerceBooleanishValue = (camelKey: string, value: unknown): unknown => {
+  if ((value === 0 || value === 1) && isBooleanishColumnName(camelKey)) {
+    return value === 1;
+  }
+
+  return value;
+};
 const isQueryToken = (value: unknown): value is SlonikQueryToken =>
   typeof value === 'object' &&
   value !== null &&
@@ -118,6 +131,15 @@ export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
         'JSON_MERGE_PATCH(COALESCE($1, JSON_OBJECT()),'
       )
       .replace(/\bto_timestamp\(([^)]+)\s*\/\s*1000\)/gi, 'FROM_UNIXTIME($1 / 1000)')
+      // Postgres regex: ~ (case-sensitive) / ~* (case-insensitive)
+      .replace(/\s+~\*\s+/g, ' REGEXP ')
+      .replace(/\s+~\s+/g, ' REGEXP BINARY ')
+      // jsonb key existence: column ? 'key'
+      .replace(
+        /((?:`[^`]+`|"[^"]+"|[a-zA-Z_][\w.]*)\s*)\?\s*'((?:\\'|[^'])*)'/g,
+        (_match, column: string, key: string) =>
+          `JSON_CONTAINS_PATH(${column.trim()}, 'one', '$.${key}')`
+      )
   );
 
 const serializeValue = (value: unknown) => {
@@ -149,10 +171,11 @@ const normalizeMariaRows = <R extends Record<string, unknown>>(rows: R[]): R[] =
   rows.map(
     (row) =>
       Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [
-          camelCaseColumnName(key),
-          normalizeJsonValue(value),
-        ])
+        Object.entries(row).map(([key, value]) => {
+          const camelKey = camelCaseColumnName(key);
+
+          return [camelKey, coerceBooleanishValue(camelKey, normalizeJsonValue(value))];
+        })
       ) as R
   );
 

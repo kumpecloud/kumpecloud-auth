@@ -47,6 +47,19 @@ export const buildJsonContains = (
   return sql`${column}::jsonb @> ${value}`;
 };
 
+/** Postgres jsonb `column ? 'key'` vs MariaDB JSON_CONTAINS_PATH. */
+export const buildJsonHasKey = (
+  column: IdentifierSqlToken,
+  key: string,
+  dialect: DatabaseDialect
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`JSON_CONTAINS_PATH(${column}, 'one', ${`$.${key}`})`;
+  }
+
+  return sql`${column} ? ${key}`;
+};
+
 export const buildJsonRemoveKey = (
   column: IdentifierSqlToken,
   key: string,

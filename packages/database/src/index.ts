@@ -49,6 +49,7 @@ export {
   buildInArrayCondition,
   buildJsonCoalesceMerge,
   buildJsonContains,
+  buildJsonHasKey,
   buildJsonRemoveKey,
   buildOnConflictDoNothing,
   buildTimestampFromMillis,
