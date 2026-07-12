@@ -34,10 +34,17 @@ describe('TenantGuard', () => {
     expect(violation?.reason).toContain('tenant-b');
   });
 
-  it('allows admin tenant to bypass filter checks', () => {
-    expect(
-      assertTenantScopedSql(`SELECT * FROM users`, { tenantId: 'admin', isAdmin: true })
-    ).toBeUndefined();
+  it('scopes admin tenant like any other tenant (Postgres RLS parity)', () => {
+    expect(assertTenantScopedSql(`SELECT * FROM users`, { tenantId: 'admin', isAdmin: true })).toEqual(
+      expect.objectContaining({ table: 'users' })
+    );
+
+    const rewritten = injectTenantIsolationPredicate(`SELECT * FROM logto_configs WHERE key = ?`, {
+      tenantId: 'admin',
+      isAdmin: true,
+    });
+
+    expect(rewritten).toContain(tenantSessionPredicate);
   });
 
   it('allows parameterized tenant_id filters', () => {

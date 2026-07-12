@@ -20,9 +20,9 @@ Target: **MariaDB 10.11+** or **11.x**, driver **mysql2**.
 
 | Concern | PostgreSQL (interim) | MariaDB |
 |---|---|---|
-| Isolation | Per-tenant DB roles + RLS (`current_user`) | Single app user + `TenantGuard` + session `@logto_tenant_id` |
+| Isolation | Per-tenant DB roles + RLS (`current_user`) | Single app user + `TenantGuard` injects `tenant_id = @logto_tenant_id` |
 | `set_tenant_id` trigger | `_functions.sql` + `_after_each.sql` | `_functions_mariadb.sql` + session variable fallback |
-| Admin tenant | Role grants + RLS policies | Explicit `tenant_id` in `TenantContext`; admin bypass where RLS allows |
+| Admin tenant | Same RLS scope via admin DB role | Same TenantGuard scope with `@logto_tenant_id = 'admin'`; cross-tenant reads use shared pool + explicit filters |
 
 Postgres RLS policy semantics (from `_after_each.sql`):
 

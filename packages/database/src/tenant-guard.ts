@@ -161,7 +161,9 @@ export const injectTenantIsolationPredicate = (
   context: TenantContext,
   tableNames: ReadonlySet<string> = tenantScopedTableNames
 ): string => {
-  if (context.isAdmin || isSessionOrTxnControl(sqlText) || isInsertStatement(sqlText)) {
+  // Admin tenant is still a tenant: Postgres RLS scopes it to its own tenant_id.
+  // Cross-tenant reads use the unwrapped shared pool with explicit tenant_id filters.
+  if (isSessionOrTxnControl(sqlText) || isInsertStatement(sqlText)) {
     return sqlText;
   }
 
@@ -199,7 +201,7 @@ export const assertTenantScopedSql = (
   context: TenantContext,
   tableNames: ReadonlySet<string> = tenantScopedTableNames
 ): TenantGuardViolation | undefined => {
-  if (context.isAdmin || isSessionOrTxnControl(sqlText) || isInsertStatement(sqlText)) {
+  if (isSessionOrTxnControl(sqlText) || isInsertStatement(sqlText)) {
     return;
   }
 
