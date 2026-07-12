@@ -15,6 +15,10 @@ type SlonikQueryToken = {
 
 type QueryInput = SlonikQueryToken | string;
 
+/** Match Slonik `createInterceptorsPreset` row key formatting (snake_case → camelCase). */
+export const camelCaseColumnName = (name: string): string =>
+  name.replaceAll(/_([a-z0-9])/gi, (_, char: string) => String(char).toUpperCase());
+
 const isQueryToken = (value: unknown): value is SlonikQueryToken =>
   typeof value === 'object' &&
   value !== null &&
@@ -141,11 +145,14 @@ const toQueryResult = <R extends Record<string, unknown>>(
     notices: [],
   }) as QueryResult<R>;
 
-const parseJsonColumnsInRows = <R extends Record<string, unknown>>(rows: R[]): R[] =>
+const normalizeMariaRows = <R extends Record<string, unknown>>(rows: R[]): R[] =>
   rows.map(
     (row) =>
       Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [key, normalizeJsonValue(value)])
+        Object.entries(row).map(([key, value]) => [
+          camelCaseColumnName(key),
+          normalizeJsonValue(value),
+        ])
       ) as R
   );
 
@@ -159,8 +166,8 @@ const executeOnConnection = async <R extends Record<string, unknown>>(
     const [result] = await connection.query(rewritten, values as unknown[]);
 
     if (Array.isArray(result)) {
-      // MariaDB often reports JSON columns as BLOB (252), so mysql2 leaves them as strings.
-      return toQueryResult(parseJsonColumnsInRows(result as R[]));
+      // MariaDB returns snake_case keys + JSON-as-string; normalize to Slonik/Postgres shape.
+      return toQueryResult(normalizeMariaRows(result as R[]));
     }
 
     const header = result as mysql.ResultSetHeader;
@@ -174,7 +181,7 @@ const executeOnConnection = async <R extends Record<string, unknown>>(
   const [result] = await connection.query(mariaSql, serialized);
 
   if (Array.isArray(result)) {
-    return toQueryResult(parseJsonColumnsInRows(result as R[]));
+    return toQueryResult(normalizeMariaRows(result as R[]));
   }
 
   const header = result as mysql.ResultSetHeader;

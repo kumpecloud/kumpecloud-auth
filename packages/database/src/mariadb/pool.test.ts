@@ -71,4 +71,28 @@ describe('createMariaPool', () => {
       { key: 'mariadbAlterationState', value: { timestamp: 1_779_000_000 } },
     ]);
   });
+
+  it('camelCases column names like Slonik interceptors', async () => {
+    queryMock.mockResolvedValueOnce([
+      [
+        {
+          oidc_client_metadata: '{"redirectUris":[]}',
+          is_third_party: 0,
+          tenant_id: 'admin',
+        },
+      ],
+      [],
+    ]);
+
+    const pool = await createMariaPool('mariadb://logto:pass@localhost:3306/logto');
+    const result = await pool.query('SELECT * FROM applications');
+
+    expect(result.rows).toEqual([
+      {
+        oidcClientMetadata: { redirectUris: [] },
+        isThirdParty: 0,
+        tenantId: 'admin',
+      },
+    ]);
+  });
 });
