@@ -16,6 +16,8 @@ import { type CommonQueryMethods, sql } from '@silverhand/slonik';
 import RelationQueries from '#src/utils/RelationQueries.js';
 import { convertToIdentifiers } from '#src/utils/sql.js';
 
+import { buildSelectDistinctOn } from './utils.js';
+
 export class ApplicationRoleRelationQueries extends RelationQueries<
   [typeof Organizations, typeof OrganizationRoles, typeof Applications]
 > {
@@ -42,8 +44,10 @@ export class ApplicationRoleRelationQueries extends RelationQueries<
     const scopes = convertToIdentifiers(OrganizationScopes, true);
 
     return this.pool.any<OrganizationScope>(sql`
-      select distinct on (${scopes.fields.id})
-        ${sql.join(Object.values(scopes.fields), sql`, `)}
+      ${buildSelectDistinctOn(
+        scopes.fields.id,
+        sql.join(Object.values(scopes.fields), sql`, `)
+      )}
       from ${this.table}
       join ${roleScopeRelations.table}
         on ${roleScopeRelations.fields.organizationRoleId} = ${fields.organizationRoleId}
@@ -69,8 +73,10 @@ export class ApplicationRoleRelationQueries extends RelationQueries<
     const scopes = convertToIdentifiers(Scopes, true);
 
     return this.pool.any<Scope>(sql`
-      select distinct on (${scopes.fields.id})
-        ${sql.join(Object.values(scopes.fields), sql`, `)}
+      ${buildSelectDistinctOn(
+        scopes.fields.id,
+        sql.join(Object.values(scopes.fields), sql`, `)
+      )}
       from ${this.table}
       join ${roleScopeRelations.table}
         on ${roleScopeRelations.fields.organizationRoleId} = ${fields.organizationRoleId}

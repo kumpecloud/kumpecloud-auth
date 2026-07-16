@@ -1,6 +1,11 @@
 import { OrganizationRoles } from '@logto/schemas';
 import { DatabaseDialect, getDatabaseDialectFromEnv } from '@logto/database';
-import { sql, type IdentifierSqlToken, type SqlSqlToken } from '@silverhand/slonik';
+import {
+  sql,
+  type IdentifierSqlToken,
+  type SqlSqlToken,
+  type ValueExpression,
+} from '@silverhand/slonik';
 
 import { convertToIdentifiers } from '#src/utils/sql.js';
 
@@ -66,4 +71,20 @@ export const aggregateNonNullIds = (
       null
     ) as ${sql.identifier([as])}
   `;
+};
+
+/**
+ * Postgres `SELECT DISTINCT ON (id) cols…` vs MariaDB `SELECT DISTINCT cols…`.
+ * Equivalent when `cols` come from a unique-keyed row (same values for a given id).
+ */
+export const buildSelectDistinctOn = (
+  distinctColumn: IdentifierSqlToken,
+  selectList: ValueExpression,
+  dialect = getDatabaseDialectFromEnv()
+): SqlSqlToken => {
+  if (dialect === DatabaseDialect.MariaDB) {
+    return sql`select distinct ${selectList}`;
+  }
+
+  return sql`select distinct on (${distinctColumn}) ${selectList}`;
 };
