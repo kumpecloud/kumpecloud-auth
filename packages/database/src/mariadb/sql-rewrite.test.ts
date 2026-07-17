@@ -47,4 +47,14 @@ describe('rewritePostgresSqlForMariaDB', () => {
       rewritePostgresSqlForMariaDB(`select * from users where jsonb_array_length(mfa_verifications) > 0`)
     ).toBe(`select * from users where JSON_LENGTH(mfa_verifications) > 0`);
   });
+
+  it('rewrites DISTINCT ON to DISTINCT', () => {
+    const rewritten = rewritePostgresSqlForMariaDB(`
+      select distinct on ("scopes"."id")
+        "scopes"."id", "scopes"."name"
+      from "organization_role_user_relations"
+    `);
+    expect(rewritten).toMatch(/select distinct\s+`scopes`\.`id`/i);
+    expect(rewritten).not.toMatch(/distinct\s+on\s*\(/i);
+  });
 });

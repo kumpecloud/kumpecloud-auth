@@ -141,6 +141,8 @@ export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
       .replaceAll('::varchar[]', '')
       .replaceAll('::double precision', '')
       .replaceAll('::int', '')
+      // DISTINCT ON (col) → DISTINCT (valid when selected cols are unique-keyed by col)
+      .replace(/\bselect\s+distinct\s+on\s*\([^)]*\)/gi, 'select distinct')
       .replace(/\bjson_build_object\b/gi, 'JSON_OBJECT')
       .replace(/\bjsonb_array_length\s*\(/gi, 'JSON_LENGTH(')
       .replace(/\bjson_array_length\s*\(/gi, 'JSON_LENGTH(')
