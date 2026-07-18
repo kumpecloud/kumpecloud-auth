@@ -131,4 +131,15 @@ describe('injectTenantIsolationPredicate', () => {
     expect(rewritten).toContain('users.tenant_id = @logto_tenant_id');
     expect(rewritten).toContain('applications.tenant_id = @logto_tenant_id');
   });
+
+  it('injects before a trailing semicolon (not after statement end)', () => {
+    const rewritten = injectTenantIsolationPredicate(
+      `select * from users where id = ?;`,
+      defaultContext
+    );
+
+    expect(rewritten).toBe(
+      `select * from users where id = ? AND ${tenantSessionPredicate};`
+    );
+  });
 });

@@ -530,8 +530,8 @@ export default class OrganizationQueries extends SchemaQueries<
    * @see {@link MfaData}
    */
   async getMfaStatus(organizationId: string, userId: string) {
-    const { table, fields } = convertToIdentifiers(Organizations);
-    const users = convertToIdentifiers(Users);
+    const { table, fields } = convertToIdentifiers(Organizations, true);
+    const users = convertToIdentifiers(Users, true);
 
     type MfaData = {
       /** Whether MFA is required for the organization. */
@@ -540,18 +540,19 @@ export default class OrganizationQueries extends SchemaQueries<
       hasMfaConfigured: boolean;
     };
 
+    // Use a top-level FROM/JOIN so MariaDB tenant isolation can inject WHERE predicates.
+    // (Scalar-subquery-only SELECTs caused predicates to append after a trailing `;`.)
     return this.pool.one<MfaData>(sql`
       select
-        (select ${fields.isMfaRequired} from ${table} where ${fields.id} = ${organizationId}),
-        exists (
-          select 1 from ${users.table} 
-            where ${users.fields.id} = ${userId}
-            and ${
-              this.#dialect === DatabaseDialect.MariaDB
-                ? sql`JSON_LENGTH(${users.fields.mfaVerifications}) > 0`
-                : sql`jsonb_array_length(${users.fields.mfaVerifications}) > 0`
-            }
-        ) as "hasMfaConfigured";
+        ${fields.isMfaRequired} as "isMfaRequired",
+        ${
+          this.#dialect === DatabaseDialect.MariaDB
+            ? sql`(JSON_LENGTH(${users.fields.mfaVerifications}) > 0)`
+            : sql`(jsonb_array_length(${users.fields.mfaVerifications}) > 0)`
+        } as "hasMfaConfigured"
+      from ${table}
+      join ${users.table} on ${users.fields.id} = ${userId}
+      where ${fields.id} = ${organizationId}
     `);
   }
 

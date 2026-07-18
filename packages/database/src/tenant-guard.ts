@@ -167,9 +167,19 @@ export const injectTenantIsolationPredicate = (
     return sqlText;
   }
 
-  const referencedTables = findReferencedTenantTables(sqlText, tableNames);
+  // Slonik sometimes includes a trailing `;`; never inject past statement end.
+  const statementEndMatch = /;+\s*$/.exec(sqlText);
+  const statementBody = statementEndMatch
+    ? sqlText.slice(0, statementEndMatch.index)
+    : sqlText;
+  const statementSuffix = statementEndMatch ? sqlText.slice(statementEndMatch.index) : '';
 
-  if (referencedTables.length === 0 || hasTenantIsolationPredicate(sqlText, context.tenantId)) {
+  const referencedTables = findReferencedTenantTables(statementBody, tableNames);
+
+  if (
+    referencedTables.length === 0 ||
+    hasTenantIsolationPredicate(statementBody, context.tenantId)
+  ) {
     return sqlText;
   }
 
@@ -178,22 +188,22 @@ export const injectTenantIsolationPredicate = (
       ? tenantSessionPredicate
       : referencedTables.map((table) => `${table}.tenant_id = @logto_tenant_id`).join(' AND ');
 
-  const trailingMatch = trailingClausePattern.exec(sqlText);
+  const trailingMatch = trailingClausePattern.exec(statementBody);
   const trailingIndex = trailingMatch?.index;
 
-  if (/\bwhere\b/i.test(sqlText)) {
+  if (/\bwhere\b/i.test(statementBody)) {
     if (trailingIndex === undefined) {
-      return `${sqlText} AND ${predicate}`;
+      return `${statementBody} AND ${predicate}${statementSuffix}`;
     }
 
-    return `${sqlText.slice(0, trailingIndex)} AND ${predicate}${sqlText.slice(trailingIndex)}`;
+    return `${statementBody.slice(0, trailingIndex)} AND ${predicate}${statementBody.slice(trailingIndex)}${statementSuffix}`;
   }
 
   if (trailingIndex === undefined) {
-    return `${sqlText} WHERE ${predicate}`;
+    return `${statementBody} WHERE ${predicate}${statementSuffix}`;
   }
 
-  return `${sqlText.slice(0, trailingIndex)} WHERE ${predicate}${sqlText.slice(trailingIndex)}`;
+  return `${statementBody.slice(0, trailingIndex)} WHERE ${predicate}${statementBody.slice(trailingIndex)}${statementSuffix}`;
 };
 
 export const assertTenantScopedSql = (
