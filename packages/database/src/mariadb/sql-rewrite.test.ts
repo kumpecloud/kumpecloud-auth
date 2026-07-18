@@ -57,4 +57,14 @@ describe('rewritePostgresSqlForMariaDB', () => {
     expect(rewritten).toMatch(/select distinct\s+`scopes`\.`id`/i);
     expect(rewritten).not.toMatch(/distinct\s+on\s*\(/i);
   });
+
+  it('rewrites empty select lists to select 1', () => {
+    const rewritten = rewritePostgresSqlForMariaDB(`
+      select
+      from "organization_user_relations"
+      where "organization_id" = $1
+      limit 1
+    `);
+    expect(rewritten).toMatch(/select 1\s+from\s+`organization_user_relations`/i);
+  });
 });

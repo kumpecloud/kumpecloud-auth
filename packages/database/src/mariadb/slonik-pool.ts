@@ -143,6 +143,8 @@ export const rewritePostgresSqlForMariaDB = (queryText: string): string =>
       .replaceAll('::int', '')
       // DISTINCT ON (col) → DISTINCT (valid when selected cols are unique-keyed by col)
       .replace(/\bselect\s+distinct\s+on\s*\([^)]*\)/gi, 'select distinct')
+      // Postgres allows empty select lists (`select from t`); MariaDB requires a column.
+      .replace(/\bselect\s+from\b/gi, 'select 1 from')
       .replace(/\bjson_build_object\b/gi, 'JSON_OBJECT')
       .replace(/\bjsonb_array_length\s*\(/gi, 'JSON_LENGTH(')
       .replace(/\bjson_array_length\s*\(/gi, 'JSON_LENGTH(')

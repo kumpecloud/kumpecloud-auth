@@ -254,8 +254,9 @@ export default class RelationQueries<
    * ```
    */
   async exists(ids: CamelCaseIdObject<Schemas[number]['tableSingular']>) {
+    // Postgres allows an empty select list; MariaDB does not. Use `1` for both.
     return this.pool.exists(sql`
-      select
+      select 1
       from ${this.table}
       where ${sql.join(
         this.schemas.map(
