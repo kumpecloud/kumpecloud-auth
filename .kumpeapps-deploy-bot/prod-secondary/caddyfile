@@ -1,0 +1,11 @@
+# Per-VM Caddy snippet (Node B). Prefer edge HA Caddy with both Nebula IPs
+# for round-robin — see ../caddy/edge-ha.caddyfile.example.
+auth.kumpe.app {
+	import ssl_defaults
+	reverse_proxy {{nebula.ip}}:3001
+}
+
+auth-console.kumpe.app {
+	import ssl_defaults
+	reverse_proxy {{nebula.ip}}:3002
+}

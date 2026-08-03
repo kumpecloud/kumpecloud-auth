@@ -1,24 +1,22 @@
-# KumpeCloud Auth production stack (Node A) for kumpeapps-deploy-bot.
+# KumpeCloud Auth production secondary stack (Node B).
 #
-# Required host environment variables (map via prod.yml env_mappings):
-#   POSTGRES_PASSWORD
-#   AUTH_ENDPOINT
-#   ADMIN_ENDPOINT
-#   SECRET_VAULT_KEK
+# Spin up on a second VM with the peer Nebula IP of Node A. On first start,
+# Postgres auto-clones from the primary; Logto joins round-robin once a writer
+# is reachable via POSTGRES_HOST_IPS.
 #
-# HA (optional — enable when Node B exists):
-#   PEER_POSTGRES_IP                 Nebula IP of Node B Postgres
-#   POSTGRES_REPLICATION_PASSWORD    Shared replication password
-#   POSTGRES_HOST_IPS                Comma-separated Nebula IPs of both Postgres nodes
-#                                    e.g. 10.10.0.11,10.10.0.12 (literal IPs, no DNS)
-#   POSTGRES_HBA_ALLOWED_CIDRS       Optional extra CIDRs for replication pg_hba
-#                                    (never 0.0.0.0/0; peer / HOST IPs used as /32 by default)
-#   NODE_PRIORITY                    Default 100 (wins split-brain vs Node B)
+# Required:
+#   POSTGRES_PASSWORD                 Same as Node A
+#   POSTGRES_REPLICATION_PASSWORD     Same as Node A
+#   PEER_POSTGRES_IP                  Nebula IP of Node A Postgres
+#   POSTGRES_HOST_IPS                 Both Nebula IPs, e.g. 10.10.0.11,10.10.0.12
+#   AUTH_ENDPOINT / ADMIN_ENDPOINT    Same public URLs as Node A
+#   SECRET_VAULT_KEK                  Same as Node A
 #
 # Optional:
-#   KUMPECLOUD_AUTH_TAG
-#   PRIVATE_KEY_ROTATION_GRACE_PERIOD
-#   SKIP_DB_SEED                     Set 1 to skip seed/alterations
+#   POSTGRES_HBA_ALLOWED_CIDRS        Extra Nebula CIDRs for replication pg_hba
+#   KUMPECLOUD_AUTH_TAG               default stable
+#   NODE_PRIORITY                     default 50 (yields to Node A on split-brain)
+#   SKIP_DB_SEED                      default 1 on secondary (schema arrives via replication)
 
 services:
   postgres:
@@ -29,14 +27,13 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: logto
-      PEER_POSTGRES_IP: ${PEER_POSTGRES_IP:-}
-      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-}
+      PEER_POSTGRES_IP: ${PEER_POSTGRES_IP:?PEER_POSTGRES_IP is required}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?POSTGRES_REPLICATION_PASSWORD is required}
       POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-replicator}
       POSTGRES_HOST_IPS: ${POSTGRES_HOST_IPS:-}
       POSTGRES_HBA_ALLOWED_CIDRS: ${POSTGRES_HBA_ALLOWED_CIDRS:-}
-      NODE_NAME: ${NODE_NAME:-a}
+      NODE_NAME: ${NODE_NAME:-b}
     ports:
-      # Published for peer streaming replication over Nebula (firewall to peer IP).
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -48,8 +45,8 @@ services:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d logto']
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 20
+      start_period: 120s
 
   failover-watch:
     image: postgres:17-alpine
@@ -61,13 +58,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      PEER_POSTGRES_IP: ${PEER_POSTGRES_IP:-}
-      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-}
+      PEER_POSTGRES_IP: ${PEER_POSTGRES_IP:?PEER_POSTGRES_IP is required}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?POSTGRES_REPLICATION_PASSWORD is required}
       POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-replicator}
       POSTGRES_HOST_IPS: ${POSTGRES_HOST_IPS:-}
       POSTGRES_HBA_ALLOWED_CIDRS: ${POSTGRES_HBA_ALLOWED_CIDRS:-}
-      NODE_NAME: ${NODE_NAME:-a}
-      NODE_PRIORITY: ${NODE_PRIORITY:-100}
+      NODE_NAME: ${NODE_NAME:-b}
+      NODE_PRIORITY: ${NODE_PRIORITY:-50}
       FAIL_THRESHOLD: ${FAIL_THRESHOLD:-5}
       POLL_INTERVAL_SEC: ${POLL_INTERVAL_SEC:-5}
     volumes:
@@ -89,9 +86,10 @@ services:
       TRUST_PROXY_HEADER: '1'
       DEV_FEATURES_ENABLED: '1'
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_HOST_IPS: ${POSTGRES_HOST_IPS:-}
-      PEER_POSTGRES_IP: ${PEER_POSTGRES_IP:-}
-      SKIP_DB_SEED: ${SKIP_DB_SEED:-0}
+      POSTGRES_HOST_IPS: ${POSTGRES_HOST_IPS:?POSTGRES_HOST_IPS is required}
+      PEER_POSTGRES_IP: ${PEER_POSTGRES_IP:?PEER_POSTGRES_IP is required}
+      # Schema is replicated from Node A; skip seed on standby / fresh secondary.
+      SKIP_DB_SEED: ${SKIP_DB_SEED:-1}
       ENDPOINT: ${AUTH_ENDPOINT:?AUTH_ENDPOINT is required}
       ADMIN_ENDPOINT: ${ADMIN_ENDPOINT:?ADMIN_ENDPOINT is required}
       ALL_YES: '1'
