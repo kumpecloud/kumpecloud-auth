@@ -1,0 +1,27 @@
+# Edge Caddy example for active-active KumpeCloud Auth (round-robin).
+# Replace NEBULA_IP_A / NEBULA_IP_B with literal Nebula IPs (no DNS).
+# Health checks drop a node that is down; surviving node keeps serving.
+#
+# Failover-only (prefer Node A): change lb_policy to `first`.
+
+auth.kumpe.app {
+	import ssl_defaults
+	reverse_proxy NEBULA_IP_A:3001 NEBULA_IP_B:3001 {
+		lb_policy round_robin
+		health_uri /api/status
+		health_interval 5s
+		health_timeout 3s
+		fail_duration 15s
+	}
+}
+
+auth-console.kumpe.app {
+	import ssl_defaults
+	reverse_proxy NEBULA_IP_A:3002 NEBULA_IP_B:3002 {
+		lb_policy round_robin
+		health_uri /
+		health_interval 5s
+		health_timeout 3s
+		fail_duration 15s
+	}
+}

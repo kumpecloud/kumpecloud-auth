@@ -51,3 +51,4 @@ packages/connectors/connector-whatsapp/test-send.mjs
 
 #Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+.cursor

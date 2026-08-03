@@ -1,26 +1,31 @@
-# Production deployment for KumpeCloud Auth
+# Production secondary deployment (Node B) for KumpeCloud Auth HA.
+#
+# Create VM prod-vm-kumpecloud-auth-b (or rename) and set Nebula secrets.
+# Domains stay on edge Caddy with both Nebula IPs — this stack should not
+# sole-own auth.kumpe.app DNS. Leave domains listed for bot inventory only
+# if your bot requires them; prefer edge HA Caddy (see caddy/edge-ha.caddyfile.example).
 
 deployment_type: docker
 assigned_username: justinkumpe
-vm_hostname: prod-vm-kumpecloud-auth
+vm_hostname: prod-vm-kumpecloud-auth-b
 
 authorized_admins:
   - github.repo.admins
 
+# Edge Caddy should round-robin both nodes; avoid duplicate sole reverse_proxy
+# ownership if the bot overwrites edge config from this file.
 domains:
   - auth.kumpe.app
   - auth-console.kumpe.app
 
 docker_compose: docker-compose.yml
 plan_name: small-ai
-# Deploy bot skips nebula_client during compose up (--no-deps) to avoid disrupting VPN;
-# start it after app services are up (same compose file, injected at deploy time).
 post_deploy_hook: 'DOCKER_CONFIG="$(pwd)/.docker" docker compose up -d --no-deps nebula_client'
 env_mappings:
-  NEBULA_CLIENT_TOKEN: PROD_NEBULA_CLIENT_TOKEN
+  NEBULA_CLIENT_TOKEN: PROD_SECONDARY_NEBULA_CLIENT_TOKEN
   POSTGRES_PASSWORD: PROD_AUTH_POSTGRES_PASSWORD
   POSTGRES_REPLICATION_PASSWORD: PROD_AUTH_POSTGRES_REPLICATION_PASSWORD
-  PEER_POSTGRES_IP: PROD_AUTH_PEER_POSTGRES_IP_B
+  PEER_POSTGRES_IP: PROD_AUTH_PEER_POSTGRES_IP_A
   POSTGRES_HOST_IPS: PROD_AUTH_POSTGRES_HOST_IPS
   SECRET_VAULT_KEK: PROD_SECRET_VAULT_KEK
   AUTH_ENDPOINT: PROD_AUTH_ENDPOINT
